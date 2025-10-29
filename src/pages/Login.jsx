@@ -14,28 +14,37 @@ export default function Login() {
     setError(null)
     setLoading(true)
     try{
+      const form = new FormData(e.target)
       if(tab === 'login'){
-        // example: POST /api/auth/login with { email, password }
-        const form = new FormData(e.target)
         // backend expects { correo, contrasena }
         const payload = {
           correo: form.get('email'),
           contrasena: form.get('password')
         }
-      // send to backend's login route
-            // avoid sending cookies for login (some backends reject stale session cookies)
-            const res = await api.post('/api/usuarios/login', payload, { credentials: 'omit', noAuth: true })
-      // backend responded with token (either raw string or { token })
-      const token = res && (res.token || res || '').toString()
-      if(token) setToken(token)
-    nav('/home')
+        // send to backend's login route
+        // avoid sending cookies for login (some backends reject stale session cookies)
+        const res = await api.post('/api/usuarios/login', payload, { credentials: 'omit', noAuth: true })
+        // backend responded with token (either raw string or { token })
+        const token = res && (res.token || res || '').toString()
+        if(token) setToken(token)
+        nav('/home')
       } else {
-        // signup flow could be implemented similarly
+        // signup: send { nombre, correo, contrasena, rol: 'cliente' }
+        const payload = {
+          nombre: form.get('nombre'),
+          correo: form.get('email'),
+          contrasena: form.get('password'),
+          rol: 'cliente'
+        }
+        const res = await api.post('/api/usuarios', payload, { credentials: 'omit', noAuth: true })
+        // if backend returns a token, save it
+        const token = res && (res.token || res || '').toString()
+        if(token) setToken(token)
         nav('/home')
       }
     }catch(err){
       // show richer error information (status + body) when available
-      console.error('login error', err)
+      console.error('auth error', err)
       const message = err && (err.data?.message || err.message || JSON.stringify(err.data) || 'Error')
       setError(message)
     }finally{
@@ -86,7 +95,7 @@ export default function Login() {
         {/* Formulario */}
         <form onSubmit={submit} className="space-y-3">
           {tab==="signup" && (
-            <input name="name" className="w-full border rounded-lg px-3 py-2" placeholder="Nombre" />
+            <input name="nombre" className="w-full border rounded-lg px-3 py-2" placeholder="Nombre" />
           )}
 
           <input name="email" autoComplete="email" className="w-full border rounded-lg px-3 py-2" placeholder="Email" />
