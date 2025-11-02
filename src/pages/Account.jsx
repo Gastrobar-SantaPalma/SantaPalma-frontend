@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast.jsx'
 
 export default function Account(){
-  const { logout } = useAuth()
   const navigate = useNavigate()
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -23,37 +22,53 @@ export default function Account(){
   const [confirmPassword, setConfirmPassword] = useState('')
   const toast = useToast()
 
-  const { token } = useAuth()
+  const { token, user: authUser, setUser: setAuthUser, logout } = useAuth()
 
   useEffect(()=>{
     let mounted = true
     async function load(){
       setLoading(true)
       try{
+        // If we already have a user in the auth context (login/signup provided it), use it.
+        if(authUser){
+          if(mounted) { setUser(authUser); return }
+        }
+
         // Only attempt to fetch /me when we have a token (prevent cookie-based anonymous sessions)
         if(!token){
           if(mounted) setUser(null)
           return
         }
+
         // fetch user profile using token; avoid sending cookies
-        const res = await api.get('/api/usuarios/me', { credentials: 'omit' })
-        if(mounted) setUser(res)
-      }catch(e){
-        console.warn('failed to load user via /me, attempting fallback', e)
-        // fallback: try /api/usuarios (may return array) or profile
+        let res = null
         try{
-          const res2 = await api.get('/api/usuarios', { credentials: 'omit' })
-          if(Array.isArray(res2)){
-            // try to pick first (best-effort)
-            if(mounted) setUser(res2[0] || null)
-          }else if(res2 && res2.user){
-            if(mounted) setUser(res2.user)
+          res = await api.get('/api/usuarios/me', { credentials: 'omit' })
+        }catch(err){
+          // if the endpoint is not found, try a common alternative under /api/auth/me
+          if(err && err.status === 404){
+            try{ res = await api.get('/api/auth/me', { credentials: 'omit' }) }catch(err2){ throw err }
           }else{
-            if(mounted) setUser(null)
+            throw err
           }
-        }catch(e2){
-          console.error('failed to load user', e, e2)
-          if(mounted) setError(e2)
+        }
+
+        // Normalize response shapes: accept { user } | { usuario } | { data: { user } } | direct user object
+        const normalized = res && (res.user || res.usuario || (res.data && (res.data.user || res.data.usuario)) || res)
+        if(mounted){ setUser(normalized); try{ setAuthUser(normalized); localStorage.setItem('user', JSON.stringify(normalized)) }catch(_){ } }
+      }catch(e){
+        // If /me fails, do NOT fall back to listing all users (that may return another user's record).
+        // Instead surface the error and handle auth issues (401) by forcing re-login.
+        console.warn('failed to load user via /me', e)
+        if(mounted){
+          setUser(null)
+          setError(e)
+          // if token invalid/expired, force logout and redirect to login
+          if(e && e.status === 401){
+            toast.show('Sesión expirada. Por favor inicia sesión de nuevo.', { type: 'error' })
+            try{ logout() }catch(_){ /* ignore */ }
+            try{ navigate('/login') }catch(_){ /* ignore */ }
+          }
         }
       }finally{
         if(mounted) setLoading(false)
