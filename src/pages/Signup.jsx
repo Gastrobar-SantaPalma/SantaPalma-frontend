@@ -38,10 +38,8 @@ export default function Signup(){
         rol: 'cliente'
       }
       const res = await api.post('/api/usuarios', payload, { credentials: 'omit', noAuth: true })
-      const token = res && (res.token || res || '').toString()
-      if(token){
-        login(token)
-      }
+      // prefer passing the whole response so AuthContext can store user when provided
+      login(res)
       nav('/home')
     }catch(err){
       console.error('signup error', err)
