@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, setToken } from "../api/client.js";
+import { api } from "../api/client.js";
+import { useAuth } from "../context/AuthContext";
 
 
 export default function Login() {
@@ -9,27 +10,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  const { login } = useAuth()
+
   const submit = async (e)=>{
     e.preventDefault();
     setError(null)
     setLoading(true)
     try{
       const form = new FormData(e.target)
-      if(tab === 'login'){
-        // backend expects { correo, contrasena }
-        const payload = {
-          correo: form.get('email'),
-          contrasena: form.get('password')
-        }
-        // send to backend's login route
-        // avoid sending cookies for login (some backends reject stale session cookies)
-        const res = await api.post('/api/usuarios/login', payload, { credentials: 'omit', noAuth: true })
-        // backend responded with token (either raw string or { token })
-        const token = res && (res.token || res || '').toString()
-        if(token) setToken(token)
-        nav('/home')
-      } else {
-        // signup: send { nombre, correo, contrasena, rol: 'cliente' }
+      if(tab === 'signup'){
+        // Signup inline: send nombre, correo, contrasena and role cliente
         const payload = {
           nombre: form.get('nombre'),
           correo: form.get('email'),
@@ -37,11 +27,30 @@ export default function Login() {
           rol: 'cliente'
         }
         const res = await api.post('/api/usuarios', payload, { credentials: 'omit', noAuth: true })
-        // if backend returns a token, save it
-        const token = res && (res.token || res || '').toString()
-        if(token) setToken(token)
-        nav('/home')
+        // backend might return token or an object with token
+        const token = res && (res.token || res.tokenString || res || '').toString()
+        if(token) {
+          login(token)
+          nav('/home')
+          return
+        }
+        // If no token returned, show success and switch to login view
+        setTab('login')
+        setError(null)
+        setLoading(false)
+        return
       }
+
+      // login flow
+      const formLogin = new FormData(e.target)
+      const payload = {
+        correo: formLogin.get('email'),
+        contrasena: formLogin.get('password')
+      }
+      const res = await api.post('/api/usuarios/login', payload, { credentials: 'omit', noAuth: true })
+      const token = res && (res.token || res || '').toString()
+      if(token) login(token)
+      nav('/home')
     }catch(err){
       // show richer error information (status + body) when available
       console.error('auth error', err)
@@ -66,51 +75,59 @@ export default function Login() {
 
 
     {/* Card */}
-      <div className="bg-white rounded-2xl shadow-card p-6 w-full max-w-sm">
+  <div className="bg-white rounded-2xl shadow-card p-6 w-full max-w-sm min-h-[360px]">
 
       
       
         {/* Tabs */}
-        <div className="flex gap-2 bg-sheet-100 rounded-full p-1 mb-6">
+        <div className="relative mb-6">
+          <div className="flex gap-2 bg-sheet-100 rounded-full p-1">
+            {/* sliding background */}
+            <div aria-hidden
+              className={`absolute top-1 left-1 h-[calc(100%-0.5rem)] w-1/2 rounded-full bg-brand-600 transform transition-transform duration-300 ease-in-out ${tab==='signup' ? 'translate-x-full' : 'translate-x-0'}`}
+            />
 
-          <button onClick={()=>setTab("login")}
-            className={`flex-1 rounded-full py-2 ${tab==="login"?"bg-brand-600 text-white":"text-ink-700"}`}>
-            Log in
-          </button>
+            <button onClick={()=>setTab("login")}
+              className={`relative flex-1 rounded-full py-2 ${tab==="login"?"text-white":"text-ink-700"}`}>
+              Iniciar sesión
+            </button>
 
-           <button onClick={()=>setTab("signup")}
-            className={`flex-1 rounded-full py-2 ${tab==="signup"?"bg-brand-600 text-white":"text-ink-700"}`}>
-            Sign up
-          </button>
+             <button onClick={()=>setTab('signup')}
+              className={`relative flex-1 rounded-full py-2 ${tab==="signup"?"text-white":"text-ink-700"}`}>
+              Registrarme
+            </button>
+          </div>
         </div>
 
       
 
          {/* Título */}
         <h2 className="text-xl font-semibold mb-4 text-ink-900">
-          {tab==="login" ? "Bienvenido a Santa Palma" : "Crear cuenta"}
+          {tab==="login" ? "Bienvenido a Santa Palma" : "Crear tu cuenta"}
         </h2>
 
 
         {/* Formulario */}
-        <form onSubmit={submit} className="space-y-3">
+        <form onSubmit={submit} className="space-y-3 transition-[opacity,transform] duration-300 ease-in-out" style={{ opacity: 1 }}>
           {tab==="signup" && (
-            <input name="nombre" className="w-full border rounded-lg px-3 py-2" placeholder="Nombre" />
+            <input name="nombre" className="w-full border rounded-lg px-3 py-2" placeholder="Nombre completo" />
           )}
 
-          <input name="email" autoComplete="email" className="w-full border rounded-lg px-3 py-2" placeholder="Email" />
+          <input name="email" autoComplete="email" className="w-full border rounded-lg px-3 py-2" placeholder="Correo electrónico" />
           <input name="password" autoComplete="current-password" className="w-full border rounded-lg px-3 py-2" placeholder="Contraseña" type="password" />
           {error && <div className="text-sm text-red-600">{error}</div>}
           <button disabled={loading} className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-full py-3 font-semibold">
-            {loading ? 'Procesando...' : (tab==="login" ? "Log in" : "Registrarme")}
+            {loading ? 'Procesando...' : (tab==="login" ? "Iniciar sesión" : "Registrarme")}
           </button>
         </form>
 
-        {tab==="login" && (
+        <div className="mt-3">
+          {tab==="login" && (
           <p className="text-right text-sm mt-2">
             ¿Olvidaste tu contraseña? <span className="text-brand-600 underline">Recuperar</span>
           </p>
-         )}
+          )}
+        </div>
       </div>
     </div>
   );
