@@ -19,5 +19,10 @@ export default ({ mode }) => {
         },
       },
     },
+      // allow preview server to accept requests for Render host
+      preview: {
+        // add your Render host here so vite preview doesn't block the Host header
+        allowedHosts: ['santapalma-frontend.onrender.com']
+      },
   })
 }
