@@ -100,7 +100,13 @@ export default function Orders() {
               const price = Number(p.precio ?? p.price ?? 0)
               return (
                 <div key={it.id} className="flex items-center gap-3">
-                  <img src={img} className="w-12 h-12 rounded" />
+                  <img
+                    src={img}
+                    alt={title}
+                    loading="lazy"
+                    onError={e=>{ e.currentTarget.onerror = null; e.currentTarget.src = '/icons/burger.png' }}
+                    className="w-20 h-20 rounded object-cover border bg-gray-100"
+                  />
                   <div className="flex-1">
                     <div className="font-semibold">{title} <span className="text-ink-500">· {it.cantidad} </span></div>
                     <div className="text-sm text-ink-700 truncate">${(price * (it.cantidad||0)).toLocaleString('es-CO')}</div>
