@@ -199,14 +199,17 @@ export default function Home() {
           }
 
           {/* Grid larger view */}
-          <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-3">
             {products.map(p=>{
               const id = p.id || p.id_producto || p.idProduct || (p.nombre||p.name)
               const img = p.imagen_url || p.image || p.img || '/images/burger.jpg'
               const precio = priceOf(p)
               return (
                 <div key={id} className="rounded-2xl bg-white shadow p-2">
-                  <div className="h-40 sm:h-48 rounded-xl bg-gray-200 mb-2 bg-cover bg-center" style={{ backgroundImage:`url('${img}')` }} />
+                  {/* square responsive image: use padding-top to preserve 1:1 aspect ratio */}
+                  <div className="w-full rounded-xl mb-2 overflow-hidden relative" style={{ paddingTop: '100%' }}>
+                    <div className="absolute inset-0 bg-gray-200 bg-cover bg-center" style={{ backgroundImage:`url('${img}')` }} />
+                  </div>
                   <div className="text-sm h-6 overflow-hidden">{p.nombre || p.name}</div>
                   <div className="text-xs text-ink-500">${precio.toLocaleString('es-CO')}</div>
                   <button onClick={()=>{ addItem(p,1); setJustAdded(id); setTimeout(()=>setJustAdded(null),1500) }} className="mt-3 w-full rounded-lg bg-brand-600 text-white py-2 flex items-center justify-center">{justAdded === id ? 'Agregado' : 'Agregar'}</button>

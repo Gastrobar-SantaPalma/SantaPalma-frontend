@@ -22,11 +22,21 @@ async function request(path, options = {}) {
   // allow skipping Authorization header per-request (useful for login)
   if(!options.noAuth && token) headers.Authorization = `Bearer ${token}`
 
+  // If the body is a FormData instance, let the browser set the Content-Type
+  let fetchBody
+  if (options.body instanceof FormData) {
+    fetchBody = options.body
+    // delete Content-Type so browser adds the correct multipart boundary
+    delete headers['Content-Type']
+  } else {
+    fetchBody = options.body ? JSON.stringify(options.body) : undefined
+  }
+
   const res = await fetch(url, {
     headers,
     credentials: options.credentials || 'include',
     method: options.method || 'GET',
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: fetchBody,
   })
 
   const text = await res.text()
