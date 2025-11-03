@@ -14,13 +14,14 @@
     "react-hook-form": "^7.0.0",
     "zod": "^3.0.0",
     "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "serve": "^14.1.2"
   },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start": "vite preview --port $PORT --host"
+    "start": "serve -s dist -l $PORT"
   },
   "eslintConfig": {
     "extends": [

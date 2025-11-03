@@ -1,6 +1,6 @@
-// Use VITE_BACKEND_URL if provided (allows direct requests to backend). If not
-// provided, fall back to relative paths so Vite's proxy can be used in dev.
-const BASE = import.meta.env.VITE_BACKEND_URL || ''
+// Use relative paths in development so Vite's proxy can forward /api to the backend
+// In production, prefer VITE_BACKEND_URL if provided.
+const BASE = (import.meta.env.MODE === 'development') ? '' : (import.meta.env.VITE_BACKEND_URL || '')
 
 let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
@@ -61,5 +61,6 @@ export const api = {
   get: (p, opts) => request(p, { ...opts, method: 'GET' }),
   post: (p, body, opts) => request(p, { ...opts, method: 'POST', body }),
   put: (p, body, opts) => request(p, { ...opts, method: 'PUT', body }),
+  patch: (p, body, opts) => request(p, { ...opts, method: 'PATCH', body }),
   del: (p, opts) => request(p, { ...opts, method: 'DELETE' }),
 }
