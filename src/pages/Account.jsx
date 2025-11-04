@@ -81,12 +81,14 @@ export default function Account(){
   // caches to avoid refetching products/clients repeatedly
   const productCacheRef = useRef({})
   const clientCacheRef = useRef({})
+  // simple state to force rerender when product cache is populated asynchronously
+  const [productLookupVersion, setProductLookupVersion] = useState(0)
 
   useEffect(()=>{
     let mounted = true
     async function load(){
       setLoading(true)
-      try{
+  try{
         // If we already have a user in the auth context (login/signup provided it), use it.
         if(authUser){
           if(mounted) { setUser(authUser); return }
@@ -258,6 +260,10 @@ export default function Account(){
               const pid = prod.id || prod.id_producto || prod.idProduct || prod.id_producto || prod.idProducto
               if(pid) mapById[String(pid)] = prod
             }
+            // populate product cache for faster lookup later
+            for(const k of Object.keys(mapById)){
+              try{ productCacheRef.current[String(k)] = mapById[k] }catch(_){ /* ignore */ }
+            }
             // attach product info to items
             for(const o of ordersArray){
               const itemsArr = o.items || o.detalle || []
@@ -267,7 +273,45 @@ export default function Account(){
               }
             }
           } else {
-            // batch endpoint not available or returned unexpected shape — don't perform per-item GETs to avoid 404 spam
+            // batch endpoint not available or returned unexpected shape — perform a bounded per-id fallback
+            // Collect missing product ids (where item has no product/name) and fetch them individually (but capped)
+            const missing = []
+            for(const o of ordersArray){
+              const itemsArr = o.items || o.detalle || []
+              for(const it of itemsArr){
+                const pid = it.id_producto || it.idProducto || it.id_prod || it.id_producto_fk || it.id_producto
+                const hasName = it.product?.nombre || it.producto?.nombre || it.nombre || it.name || it.producto_nombre || it.nombre_producto
+                if(pid && !hasName && !(productCacheRef.current && productCacheRef.current[String(pid)])){
+                  missing.push(String(pid))
+                }
+              }
+            }
+            // unique and capped to avoid flooding the backend
+            const uniqueMissing = Array.from(new Set(missing)).slice(0, 30)
+            if(uniqueMissing.length > 0){
+              try{
+                const promises = uniqueMissing.map(pid => api.get(`/api/productos/${pid}`).then(res=>({ pid, res })).catch(err=>({ pid, res: null })))
+                const results = await Promise.all(promises)
+                for(const r of results){
+                  // normalize different backend shapes into a product object
+                  const raw = r.res
+                  const prodObj = raw && (raw.producto || raw.product || (raw.data && (raw.data.producto || raw.data.product)) || (Array.isArray(raw) && raw[0])) || raw || null
+                  productCacheRef.current[String(r.pid)] = prodObj
+                }
+                // attach found products to items
+                for(const o of ordersArray){
+                  const itemsArr = o.items || o.detalle || []
+                  for(const it of itemsArr){
+                    const pid = it.id_producto || it.idProducto || it.id_prod || it.id_producto_fk || it.id_producto
+                    if(pid && productCacheRef.current[String(pid)]) it.product = productCacheRef.current[String(pid)]
+                  }
+                }
+                // trigger rerender so UI picks up attached names
+                setProductLookupVersion(v=>v+1)
+              }catch(e){
+                console.warn('per-id product enrichment failed', e)
+              }
+            }
           }
         }
       }catch(e){
