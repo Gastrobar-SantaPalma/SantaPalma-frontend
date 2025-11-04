@@ -5,3 +5,16 @@
 @layer base {
   html, body { font-family: "Poppins", system-ui, sans-serif; }
 }
+@keyframes slideIn {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.animate-slideIn {
+  animation: slideIn 0.3s ease-out forwards;
+}
+
