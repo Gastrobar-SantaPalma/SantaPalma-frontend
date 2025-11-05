@@ -127,3 +127,11 @@ async function requestBlob(path, options = {}) {
 export const apiBlob = {
   getBlob: (p, opts) => requestBlob(p, { ...opts, method: 'GET' }),
 }
+
+// Default export for consumers that import the module as a default (builds or third-party code)
+export default {
+  api,
+  apiBlob,
+  setToken,
+  clearToken,
+}
