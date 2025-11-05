@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react'
 import { api } from '../api/client.js'
+import MesaBanner from '../components/MesaBanner'
 import { useCart } from '../store/cart.jsx'
 import { useNavigate } from 'react-router-dom'
 
@@ -37,6 +38,24 @@ export default function Home() {
       }
     }
     loadCats()
+  }, [])
+
+  // Clear product list when another user logs in or when logout happens
+  useEffect(()=>{
+    function handleAuthClear(){
+      setProducts([])
+      setProductsError(null)
+    }
+    if(typeof window !== 'undefined'){
+      window.addEventListener('auth:login', handleAuthClear)
+      window.addEventListener('auth:logout', handleAuthClear)
+    }
+    return ()=>{
+      if(typeof window !== 'undefined'){
+        window.removeEventListener('auth:login', handleAuthClear)
+        window.removeEventListener('auth:logout', handleAuthClear)
+      }
+    }
   }, [])
 
   // when a search query is set, switch selected to the virtual 'Busqueda' category
@@ -142,6 +161,10 @@ export default function Home() {
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="px-1">
+        <MesaBanner />
       </div>
 
       {/* TABS */}

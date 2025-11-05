@@ -41,6 +41,8 @@ export function AuthProvider({ children }){
       try{ localStorage.setItem('user', JSON.stringify(maybeUser)) }catch{}
       try{ setUser(maybeUser) }catch(_){ }
     }
+    // Emit a global event so other parts of the app can react to a new login (e.g., clear caches)
+    try{ if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('auth:login', { detail: { token: maybeToken, user: maybeUser } })) }catch(e){}
   }
 
   const logout = ()=>{
@@ -48,6 +50,8 @@ export function AuthProvider({ children }){
     setToken(null)
     setUser(null)
     try{ localStorage.removeItem('user') }catch{}
+    // Emit global logout event so other parts can react (clear caches/state)
+    try{ if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('auth:logout')) }catch(e){}
   }
 
   useEffect(()=>{

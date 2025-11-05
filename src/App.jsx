@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 import Orders from "./pages/Orders";
 import Account from "./pages/Account";
 import PrivateRoute from "./components/PrivateRoute";
+import TableLanding from "./pages/TableLanding";
 
 export default function App() {
   return (
@@ -14,6 +15,8 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
   <Route path="/signup" element={<Signup />} />
+  {/* QR landing route: /m/:venue/table/:tableId */}
+  <Route path="/m/:venue/table/:tableId" element={<TableLanding />} />
 
       {/* Rutas con layout (TopBar + BottomNav) */}
       <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
