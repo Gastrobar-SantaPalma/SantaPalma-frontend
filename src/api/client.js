@@ -96,3 +96,34 @@ export const api = {
   patch: (p, body, opts) => request(p, { ...opts, method: 'PATCH', body }),
   del: (p, opts) => request(p, { ...opts, method: 'DELETE' }),
 }
+
+// Helper to fetch binary/blob responses while reusing BASE and Authorization handling.
+async function requestBlob(path, options = {}) {
+  const url = path.startsWith('http') ? path : `${BASE}${path}`
+  if (typeof window !== 'undefined') console.debug('[api] request (blob) url ->', url, 'BASE=', BASE)
+  const headers = { ...(options.headers||{}) }
+  if(!options.noAuth && token) headers.Authorization = `Bearer ${token}`
+
+  const res = await fetch(url, {
+    headers,
+    credentials: options.credentials || 'include',
+    method: options.method || 'GET',
+    body: options.body
+  })
+
+  if (!res.ok) {
+    let text = ''
+    try{ text = await res.text() }catch(_){ text = '' }
+    const err = new Error(text || res.statusText)
+    err.status = res.status
+    err.data = text
+    throw err
+  }
+
+  const blob = await res.blob()
+  return blob
+}
+
+export const apiBlob = {
+  getBlob: (p, opts) => requestBlob(p, { ...opts, method: 'GET' }),
+}

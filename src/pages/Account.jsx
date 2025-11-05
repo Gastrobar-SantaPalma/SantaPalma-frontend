@@ -906,53 +906,20 @@ export default function Account(){
                 setQrLoading(true)
                 try{
                   const mesaId = Math.max(1, parseInt(qrMesaInput) || 1)
-                  const url = `/api/mesas/${mesaId}/generate-qr`
-                  const headers = {}
-                  if(token) headers.Authorization = `Bearer ${token}`
-                  // debug: log the request details so we can see which route is being called
-                  console.debug('[QR] request ->', { method: 'GET', url, headers, credentials: 'include' })
-                  let resp = await fetch(url, { method: 'GET', headers, credentials: 'include' })
-                  console.debug('[QR] response status ->', resp.status, resp.statusText)
-                  // If GET returns 404, try POST as backend might expect POST for generation
-                  if(resp.status === 404){
-                    console.debug('[QR] GET returned 404, attempting POST fallback to', url)
-                    try{
-                      resp = await fetch(url, { method: 'POST', headers, credentials: 'include' })
-                      console.debug('[QR] POST response status ->', resp.status, resp.statusText)
-                    }catch(postErr){
-                      console.debug('[QR] POST fallback errored', postErr)
-                    }
-                  }
-
-                  if(!resp.ok){
-                    // final attempt: try absolute backend host in case Vite proxy not configured
-                    if(resp.status === 404){
-                      try{
-                        const abs = `http://localhost:3000${url}`
-                        console.debug('[QR] trying absolute backend URL ->', abs)
-                        resp = await fetch(abs, { method: 'GET', headers, credentials: 'include' })
-                        console.debug('[QR] absolute GET status ->', resp.status, resp.statusText)
-                      }catch(absErr){ console.debug('[QR] absolute request failed', absErr) }
-                    }
-                  }
-
-                  if(!resp.ok){
-                    let txt = ''
-                    try{ txt = await resp.text() }catch(_){ txt = '[unreadable]' }
-                    console.debug('[QR] response body ->', txt)
-                    throw new Error(`Error generando QR: ${resp.status} ${resp.statusText} ${txt}`)
-                  }
-
-                  const blob = await resp.blob()
+                  const path = `/api/mesas/${mesaId}/generate-qr`
+                  console.debug('[QR] request path ->', path)
+                  // use apiBlob.getBlob so BASE (VITE_BACKEND_URL in production) and Authorization are respected
+                  const blob = await apiBlob.getBlob(path, { credentials: 'include' })
                   const obj = URL.createObjectURL(blob)
                   // revoke previous
                   try{ if(qrUrl) URL.revokeObjectURL(qrUrl) }catch(_){ }
                   setQrUrl(obj)
-                  // Nota: ya no persistimos codigo_qr desde el frontend (se eliminará de la BD). Solo mostramos preview y permitimos descarga.
-                  toast.show('QR generado (no se guarda en la base de datos desde el frontend)', { type: 'success' })
+                  toast.show('QR generado (previsualización lista)', { type: 'success' })
                 }catch(err){
                   console.error('[QR] generation failed', err)
-                  toast.show((err && err.message) || 'Error generando QR', { type: 'error' })
+                  // surface server error body when available
+                  const msg = err && (err.data || err.message) || 'Error generando QR'
+                  toast.show(String(msg), { type: 'error' })
                 }finally{ setQrLoading(false) }
               }} className="px-3 py-2 rounded-lg bg-brand-600 text-white">{qrLoading ? 'Generando...' : 'Generar QR'}</button>
               <button onClick={()=>{
