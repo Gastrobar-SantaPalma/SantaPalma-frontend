@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { api } from '../api/client.js'
+import { api, apiBlob } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast.jsx'
