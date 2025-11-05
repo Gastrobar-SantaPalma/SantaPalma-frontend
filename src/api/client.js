@@ -5,8 +5,20 @@ const BASE = (import.meta.env.MODE === 'development') ? '' : (import.meta.env.VI
 let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
 export function setToken(t){
-  token = t
-  if(typeof window !== 'undefined') localStorage.setItem('token', t)
+  // Accept either a raw token string or an object containing the token in several possible shapes.
+  let final = t
+  if (final && typeof final === 'object') {
+    // common shapes: { token: '...', accessToken: '...' } or { data: { token: '...' } }
+    final = final.token || final.accessToken || final.tokenString || (final.data && (final.data.token || final.data.accessToken)) || (final.result && final.result.token) || null
+  }
+  if (final == null) {
+    token = null
+    if(typeof window !== 'undefined') localStorage.removeItem('token')
+    return
+  }
+  if (typeof final !== 'string') final = String(final)
+  token = final
+  if(typeof window !== 'undefined') localStorage.setItem('token', final)
 }
 
 export function clearToken(){
@@ -32,6 +44,15 @@ async function request(path, options = {}) {
     fetchBody = options.body ? JSON.stringify(options.body) : undefined
   }
 
+  const IS_DEV = import.meta.env.MODE === 'development' && typeof window !== 'undefined'
+  if (IS_DEV) {
+    // Mask token for logs (show only first 6 chars)
+    const authHeader = headers.Authorization || null
+    const maskedAuth = authHeader ? authHeader.replace(/(Bearer\s+)(.{6})(.*)/, '$1$2...') : null
+    const headersForLog = { ...headers, Authorization: maskedAuth }
+    console.debug('[api][dev] ->', { method: options.method || 'GET', url, headers: headersForLog, bodyPreview: options.body && typeof options.body !== 'object' ? String(options.body).slice(0,200) : (options.body ? '[object]' : undefined) })
+  }
+
   const res = await fetch(url, {
     headers,
     credentials: options.credentials || 'include',
@@ -46,6 +67,17 @@ async function request(path, options = {}) {
     } catch (e) {
       data = text
     }
+
+  if (IS_DEV) {
+    // safe preview of response body
+    let bodyPreview
+    try {
+      bodyPreview = typeof data === 'string' ? data.slice(0,200) : JSON.stringify(data).slice(0,400)
+    } catch (e) {
+      bodyPreview = '[unserializable]'
+    }
+    console.debug('[api][dev] <-', { method: options.method || 'GET', url, status: res.status, bodyPreview })
+  }
 
   if (!res.ok) {
     const err = new Error(data && data.message ? data.message : res.statusText)

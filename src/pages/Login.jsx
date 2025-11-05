@@ -27,18 +27,30 @@ export default function Login() {
           rol: 'cliente'
         }
         const res = await api.post('/api/usuarios', payload, { credentials: 'omit', noAuth: true })
-        // backend might return token or an object with token
-        const token = res && (res.token || res.tokenString || res || '').toString()
-        if(token) {
-          login(token)
+        // backend might return a token string or an object containing the token/user.
+        // Prefer passing the full response to `login()` so the AuthContext can extract token/user.
+        const maybeToken = res && (res.token || res.tokenString || res.accessToken || (typeof res === 'string' ? res : null))
+        if (maybeToken) {
+          login(res)
           nav('/home')
           return
         }
-        // If no token returned, show success and switch to login view
-        setTab('login')
-        setError(null)
-        setLoading(false)
-        return
+        // If no token returned, attempt an automatic login using the provided credentials
+        try {
+          if (import.meta.env.MODE === 'development') console.debug('[login][dev] signup returned no token, attempting auto-login for', payload.correo)
+          const auth = await api.post('/api/usuarios/login', { correo: payload.correo, contrasena: payload.contrasena }, { credentials: 'omit', noAuth: true })
+          if (import.meta.env.MODE === 'development') console.debug('[login][dev] auto-login response ->', auth)
+          login(auth)
+          nav('/home')
+          return
+        } catch (e) {
+          if (import.meta.env.MODE === 'development') console.debug('[login][dev] auto-login failed after signup ->', e)
+          // If auto-login fails, show success and switch to login view
+          setTab('login')
+          setError(null)
+          setLoading(false)
+          return
+        }
       }
 
       // login flow
