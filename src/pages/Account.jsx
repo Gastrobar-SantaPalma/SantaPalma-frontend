@@ -908,8 +908,21 @@ export default function Account(){
                   const mesaId = Math.max(1, parseInt(qrMesaInput) || 1)
                   const path = `/api/mesas/${mesaId}/generate-qr`
                   console.debug('[QR] request path ->', path)
-                  // use apiBlob.getBlob so BASE (VITE_BACKEND_URL in production) and Authorization are respected
-                  const blob = await apiBlob.getBlob(path, { credentials: 'include' })
+                  // try GET first; if 404, attempt POST fallback (some backends implement QR generation as POST)
+                  let blob = null
+                  try{
+                    blob = await apiBlob.getBlob(path, { credentials: 'include' })
+                  }catch(gErr){
+                    console.warn('[QR] GET failed', gErr)
+                    if(gErr && gErr.status === 404){
+                      console.debug('[QR] GET returned 404 — trying POST fallback')
+                      // try POST fallback
+                      blob = await apiBlob.fetchBlob(path, { method: 'POST', credentials: 'include' })
+                    } else {
+                      throw gErr
+                    }
+                  }
+
                   const obj = URL.createObjectURL(blob)
                   // revoke previous
                   try{ if(qrUrl) URL.revokeObjectURL(qrUrl) }catch(_){ }

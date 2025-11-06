@@ -126,6 +126,8 @@ async function requestBlob(path, options = {}) {
 
 export const apiBlob = {
   getBlob: (p, opts) => requestBlob(p, { ...opts, method: 'GET' }),
+  // generic fetch for blob responses allowing explicit method (POST/GET)
+  fetchBlob: (p, opts) => requestBlob(p, opts),
 }
 
 // Default export for consumers that import the module as a default (builds or third-party code)
