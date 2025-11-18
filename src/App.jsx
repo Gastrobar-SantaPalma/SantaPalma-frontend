@@ -10,6 +10,7 @@ import PrivateRoute from "./components/PrivateRoute";
 import ProductDetail from "./pages/ProductDetail"; // <<-- MANTENIDO de HEAD
 import { OrderProvider } from "./context/OrderContext"; // <<-- MANTENIDO de HEAD
 import TableLanding from "./pages/TableLanding"; // <<-- MANTENIDO de main
+import CheckoutPreview from "./pages/CheckoutPreview";
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
         <Route path="/cart" element={<Orders />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/checkout" element={<CheckoutPreview />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
