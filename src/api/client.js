@@ -1,6 +1,10 @@
 // Use relative paths in development so Vite's proxy can forward /api to the backend
 // In production, prefer VITE_BACKEND_URL if provided.
-const BASE = (import.meta.env.MODE === 'development') ? '' : (import.meta.env.VITE_BACKEND_URL || '')
+const BASE =
+  import.meta.env.MODE === "development"
+    ? "http://localhost:4000"   // 👈 tu backend
+    : import.meta.env.VITE_BACKEND_URL || "";
+
 
 let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
@@ -64,3 +68,10 @@ export const api = {
   patch: (p, body, opts) => request(p, { ...opts, method: 'PATCH', body }),
   del: (p, opts) => request(p, { ...opts, method: 'DELETE' }),
 }
+
+export function confirmarPedido(pedidoId) {
+  return api.patch(`/orders/${pedidoId}/confirm`, {
+    estado: "por_cobrar"
+  });
+}
+

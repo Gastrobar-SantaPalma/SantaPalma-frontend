@@ -7,20 +7,29 @@ import Home from "./pages/Home";
 import Orders from "./pages/Orders";
 import Account from "./pages/Account";
 import PrivateRoute from "./components/PrivateRoute";
+import ProductDetail from "./pages/ProductDetail";
+import { OrderProvider } from "./context/OrderContext";
 
 export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
-  <Route path="/signup" element={<Signup />} />
+      <Route path="/signup" element={<Signup />} />
 
-      {/* Rutas con layout (TopBar + BottomNav) */}
-      <Route element={<PrivateRoute><AppLayout /></PrivateRoute>}>
-  <Route path="/home" element={<Home />} />
-  {/* /cart route was removed; map /cart to Orders (carrito manejado in Orders) */}
-  <Route path="/cart" element={<Orders />} />
-  <Route path="/orders" element={<Orders />} />
+      <Route
+        element={
+          <PrivateRoute>
+            <OrderProvider>
+              <AppLayout />
+            </OrderProvider>
+          </PrivateRoute>
+        }
+      >
+        <Route path="/home" element={<Home />} />
+        <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/cart" element={<Orders />} />
+        <Route path="/orders" element={<Orders />} />
         <Route path="/account" element={<Account />} />
       </Route>
 

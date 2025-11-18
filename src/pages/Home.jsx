@@ -2,6 +2,9 @@ import React, { useEffect, useState, useRef } from 'react'
 import { api } from '../api/client.js'
 import { useCart } from '../store/cart.jsx'
 import { useNavigate } from 'react-router-dom'
+import { Link } from "react-router-dom"
+import PendingOrderCard from "../components/PendingOrderCard"
+
 
 export default function Home() {
   const SEARCH_CATEGORY_ID = '__search__'
@@ -120,7 +123,11 @@ export default function Home() {
   }
 
   return (
+    
     <div className="space-y-6">
+      
+      <PendingOrderCard />
+      
       {/* HERO con fondo y overlay */}
       <div className="w-full h-64 sm:h-80 md:h-96 lg:h-[28rem] relative bg-cover bg-center rounded-2xl overflow-hidden"
         style={{ backgroundImage: "url('/images/IMG_6990.JPG')" }}
@@ -206,14 +213,26 @@ export default function Home() {
               const precio = priceOf(p)
               return (
                 <div key={id} className="rounded-2xl bg-white shadow p-2">
-                  {/* square responsive image: use padding-top to preserve 1:1 aspect ratio */}
-                  <div className="w-full rounded-xl mb-2 overflow-hidden relative" style={{ paddingTop: '100%' }}>
-                    <div className="absolute inset-0 bg-gray-200 bg-cover bg-center" style={{ backgroundImage:`url('${img}')` }} />
-                  </div>
-                  <div className="text-sm h-6 overflow-hidden">{p.nombre || p.name}</div>
-                  <div className="text-xs text-ink-500">${precio.toLocaleString('es-CO')}</div>
-                  <button onClick={()=>{ addItem(p,1); setJustAdded(id); setTimeout(()=>setJustAdded(null),1500) }} className="mt-3 w-full rounded-lg bg-brand-600 text-white py-2 flex items-center justify-center">{justAdded === id ? 'Agregado' : 'Agregar'}</button>
-                </div>
+  <Link to={`/product/${id}`} className="block">
+    <div className="w-full rounded-xl mb-2 overflow-hidden relative" style={{ paddingTop: '100%' }}>
+      <div
+        className="absolute inset-0 bg-gray-200 bg-cover bg-center"
+        style={{ backgroundImage:`url('${img}')` }}
+      />
+    </div>
+    <div className="text-sm h-6 overflow-hidden">{p.nombre || p.name}</div>
+    <div className="text-xs text-ink-500">${precio.toLocaleString('es-CO')}</div>
+  </Link>
+
+  <button 
+    onClick={()=>{ addItem(p,1); setJustAdded(id); setTimeout(()=>setJustAdded(null),1500) }}
+    className="mt-3 w-full rounded-lg bg-brand-600 text-white py-2 flex items-center justify-center"
+  >
+    {justAdded === id ? 'Agregado' : 'Agregar'}
+  </button>
+</div>
+
+
               )
             })}
           </div>
