@@ -67,6 +67,23 @@ export function CartProvider({ children }){
     dispatch({ type: 'hydrate', payload: stored })
   }, [])
 
+  // Clear cart when an auth login/logout event happens (so different users don't share cart)
+  useEffect(()=>{
+    function onAuthClear(){
+      dispatch({ type: 'clear' })
+    }
+    if (typeof window !== 'undefined'){
+      window.addEventListener('auth:login', onAuthClear)
+      window.addEventListener('auth:logout', onAuthClear)
+    }
+    return ()=>{
+      if (typeof window !== 'undefined'){
+        window.removeEventListener('auth:login', onAuthClear)
+        window.removeEventListener('auth:logout', onAuthClear)
+      }
+    }
+  }, [])
+
   useEffect(()=>{
     writeStorage(state)
   }, [state])

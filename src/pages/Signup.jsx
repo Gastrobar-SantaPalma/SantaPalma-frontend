@@ -38,8 +38,27 @@ export default function Signup(){
         rol: 'cliente'
       }
       const res = await api.post('/api/usuarios', payload, { credentials: 'omit', noAuth: true })
-      // prefer passing the whole response so AuthContext can store user when provided
-      login(res)
+      if (import.meta.env.MODE === 'development') {
+        console.debug('[signup][dev] created user response ->', res)
+      }
+      // If backend returns a token directly or an object with token, use it.
+      // Otherwise, attempt to immediately authenticate the new user.
+      const maybeToken = res && (res.token || (typeof res === 'string' ? res : null))
+      if(maybeToken){
+        login(res)
+      }else{
+        try{
+          if (import.meta.env.MODE === 'development') console.debug('[signup][dev] attempting auto-login for', data.correo)
+          const auth = await api.post('/api/usuarios/login', { correo: data.correo, contrasena: data.contrasena }, { credentials: 'omit', noAuth: true })
+          if (import.meta.env.MODE === 'development') console.debug('[signup][dev] auto-login response ->', auth)
+          // login will handle token/user shapes
+          login(auth)
+        }catch(loginErr){
+          if (import.meta.env.MODE === 'development') console.debug('[signup][dev] auto-login failed ->', loginErr)
+          // If automatic login fails, still set user if returned by create endpoint
+          login(res)
+        }
+      }
       nav('/home')
     }catch(err){
       console.error('signup error', err)

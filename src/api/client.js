@@ -1,65 +1,4 @@
-// Use relative paths in development so Vite's proxy can forward /api to the backend
-// In production, prefer VITE_BACKEND_URL if provided.
-const BASE =
-  import.meta.env.MODE === "development"
-    ? "http://localhost:4000"   // 👈 tu backend
-    : import.meta.env.VITE_BACKEND_URL || "";
-
-
-let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
-
-export function setToken(t){
-  token = t
-  if(typeof window !== 'undefined') localStorage.setItem('token', t)
-}
-
-export function clearToken(){
-  token = null
-  if(typeof window !== 'undefined') localStorage.removeItem('token')
-}
-
-async function request(path, options = {}) {
-  const url = path.startsWith('http') ? path : `${BASE}${path}`
-  // debug: print resolved URL so we can see if proxy will be used (relative) or an absolute backend URL
-  if (typeof window !== 'undefined') console.debug('[api] request url ->', url, 'BASE=', BASE)
-  const headers = { 'Content-Type': 'application/json' , ...(options.headers||{})}
-  // allow skipping Authorization header per-request (useful for login)
-  if(!options.noAuth && token) headers.Authorization = `Bearer ${token}`
-
-  // If the body is a FormData instance, let the browser set the Content-Type
-  let fetchBody
-  if (options.body instanceof FormData) {
-    fetchBody = options.body
-    // delete Content-Type so browser adds the correct multipart boundary
-    delete headers['Content-Type']
-  } else {
-    fetchBody = options.body ? JSON.stringify(options.body) : undefined
-  }
-
-  const res = await fetch(url, {
-    headers,
-    credentials: options.credentials || 'include',
-    method: options.method || 'GET',
-    body: fetchBody,
-  })
-
-  const text = await res.text()
-    let data
-    try {
-      data = text ? JSON.parse(text) : null
-    } catch (e) {
-      data = text
-    }
-
-  if (!res.ok) {
-    const err = new Error(data && data.message ? data.message : res.statusText)
-    err.status = res.status
-    err.data = data
-    throw err
-  }
-
-  return data
-}
+// ... [código anterior, hasta el final de export const api] ...
 
 export const api = {
   get: (p, opts) => request(p, { ...opts, method: 'GET' }),
@@ -69,9 +8,43 @@ export const api = {
   del: (p, opts) => request(p, { ...opts, method: 'DELETE' }),
 }
 
-export function confirmarPedido(pedidoId) {
-  return api.patch(`/orders/${pedidoId}/confirm`, {
-    estado: "por_cobrar"
-  });
+// Helper to fetch binary/blob responses while reusing BASE and Authorization handling.
+async function requestBlob(path, options = {}) {
+  const url = path.startsWith('http') ? path : `${BASE}${path}`
+  if (typeof window !== 'undefined') console.debug('[api] request (blob) url ->', url, 'BASE=', BASE)
+  const headers = { ...(options.headers||{}) }
+  if(!options.noAuth && token) headers.Authorization = `Bearer ${token}`
+
+  const res = await fetch(url, {
+    headers,
+    credentials: options.credentials || 'include',
+    method: options.method || 'GET',
+    body: options.body
+  })
+
+  if (!res.ok) {
+    let text = ''
+    try{ text = await res.text() }catch(_){ text = '' }
+    const err = new Error(text || res.statusText)
+    err.status = res.status
+    err.data = text
+    throw err
+  }
+
+  const blob = await res.blob()
+  return blob
 }
 
+export const apiBlob = {
+  getBlob: (p, opts) => requestBlob(p, { ...opts, method: 'GET' }),
+  // generic fetch for blob responses allowing explicit method (POST/GET)
+  fetchBlob: (p, opts) => requestBlob(p, opts),
+}
+
+// Default export for consumers that import the module as a default (builds or third-party code)
+export default {
+  api,
+  apiBlob,
+  setToken,
+  clearToken,
+}

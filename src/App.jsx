@@ -7,8 +7,9 @@ import Home from "./pages/Home";
 import Orders from "./pages/Orders";
 import Account from "./pages/Account";
 import PrivateRoute from "./components/PrivateRoute";
-import ProductDetail from "./pages/ProductDetail";
-import { OrderProvider } from "./context/OrderContext";
+import ProductDetail from "./pages/ProductDetail"; // <<-- MANTENIDO de HEAD
+import { OrderProvider } from "./context/OrderContext"; // <<-- MANTENIDO de HEAD
+import TableLanding from "./pages/TableLanding"; // <<-- MANTENIDO de main
 
 export default function App() {
   return (
@@ -16,6 +17,9 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+
+      {/* RUTA NUEVA DE MAIN (Para QR landing) */}
+      <Route path="/m/:venue/table/:tableId" element={<TableLanding />} /> 
 
       <Route
         element={

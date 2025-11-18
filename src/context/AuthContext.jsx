@@ -18,16 +18,31 @@ export function AuthProvider({ children }){
   // accepts either a token string or a response object { token, user }
   const login = (payload)=>{
     if(!payload) return
+    if (import.meta.env.MODE === 'development') {
+      // Mask token-like strings/objects for logs
+      try{
+        const preview = typeof payload === 'string' ? payload.slice(0,40) : (payload && payload.token ? (String(payload.token).slice(0,40)) : '[object]')
+        console.debug('[auth][dev] login() received payload preview ->', preview)
+      }catch(e){/* ignore */}
+    }
     if(typeof payload === 'string'){
       apiSetToken(payload)
       setToken(payload)
       return
     }
-    // payload is an object - try to extract token and user
-    const t = payload.token || payload.tokenString || (typeof payload === 'string' ? payload : null)
-    const u = payload.user || payload.usuario || payload.data || null
-    if(t){ apiSetToken(t); setToken(t) }
-    if(u){ try{ localStorage.setItem('user', JSON.stringify(u)) }catch{}; setUser(u) }
+    // payload is an object - try to extract token and user from common shapes
+    const maybeToken = payload.token || payload.tokenString || payload.accessToken || (payload.data && (payload.data.token || payload.data.accessToken)) || (payload.result && payload.result.token) || null
+    const maybeUser = payload.user || payload.usuario || (payload.data && (payload.data.user || payload.data.usuario)) || payload.result || null
+    if(maybeToken){
+      try{ apiSetToken(maybeToken) }catch(_){ }
+      try{ setToken(maybeToken) }catch(_){ }
+    }
+    if(maybeUser){
+      try{ localStorage.setItem('user', JSON.stringify(maybeUser)) }catch{}
+      try{ setUser(maybeUser) }catch(_){ }
+    }
+    // Emit a global event so other parts of the app can react to a new login (e.g., clear caches)
+    try{ if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('auth:login', { detail: { token: maybeToken, user: maybeUser } })) }catch(e){}
   }
 
   const logout = ()=>{
@@ -35,6 +50,8 @@ export function AuthProvider({ children }){
     setToken(null)
     setUser(null)
     try{ localStorage.removeItem('user') }catch{}
+    // Emit global logout event so other parts can react (clear caches/state)
+    try{ if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('auth:logout')) }catch(e){}
   }
 
   useEffect(()=>{

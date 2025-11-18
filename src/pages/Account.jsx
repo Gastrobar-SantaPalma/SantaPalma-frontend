@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { api } from '../api/client.js'
+import { api, apiBlob } from '../api/client.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useNavigate } from 'react-router-dom'
 import { useToast } from '../components/Toast.jsx'
@@ -49,6 +49,16 @@ export default function Account(){
   const [createNameError, setCreateNameError] = useState('')
   const [editNameError, setEditNameError] = useState('')
   const [productsOpen, setProductsOpen] = useState(false)
+  // QR generation state (admin)
+  // keep the input as a string so the user can clear/edit freely, and parse to number only when needed
+  const [qrMesaInput, setQrMesaInput] = useState('1')
+  const [qrLoading, setQrLoading] = useState(false)
+  const [qrUrl, setQrUrl] = useState(null)
+  // mesa creation state (admin)
+  const [newMesaId, setNewMesaId] = useState('')
+  const [newMesaEstado, setNewMesaEstado] = useState('libre')
+  const [newMesaUbicacion, setNewMesaUbicacion] = useState('')
+  const [creatingMesa, setCreatingMesa] = useState(false)
   // categories management state (admin)
   const [categoriesOpenPanel, setCategoriesOpenPanel] = useState(false)
   const [categorySearch, setCategorySearch] = useState('')
@@ -876,6 +886,126 @@ export default function Account(){
               )}
             </div>
           )}
+        </section>
+      )}
+
+      {/* Admin: Generar QR para una mesa */}
+      {authUser && (authUser.rol === 'admin' || authUser.role === 'admin') && (
+        <section className="bg-white rounded-2xl p-4 shadow-card">
+          <h3 className="font-semibold">Gestionar mesas</h3>
+          <p className="text-sm text-ink-500 mt-2">Crea un código QR para una mesa específica. Esta acción sólo puede realizarla un administrador.</p>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+            <div className="md:col-span-2">
+              <label className="block text-sm">ID de la mesa</label>
+              <div className="flex items-center gap-2">
+                <input type="number" min="1" value={qrMesaInput} onChange={e=>setQrMesaInput(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={async ()=>{
+                setQrLoading(true)
+                try{
+                  const mesaId = Math.max(1, parseInt(qrMesaInput) || 1)
+                  const path = `/api/mesas/${mesaId}/generate-qr`
+                  console.debug('[QR] request path ->', path)
+                  // try GET first; if 404, attempt POST fallback (some backends implement QR generation as POST)
+                  let blob = null
+                  try{
+                    blob = await apiBlob.getBlob(path, { credentials: 'include' })
+                  }catch(gErr){
+                    console.warn('[QR] GET failed', gErr)
+                    if(gErr && gErr.status === 404){
+                      console.debug('[QR] GET returned 404 — trying POST fallback')
+                      // try POST fallback
+                      blob = await apiBlob.fetchBlob(path, { method: 'POST', credentials: 'include' })
+                    } else {
+                      throw gErr
+                    }
+                  }
+
+                  const obj = URL.createObjectURL(blob)
+                  // revoke previous
+                  try{ if(qrUrl) URL.revokeObjectURL(qrUrl) }catch(_){ }
+                  setQrUrl(obj)
+                  toast.show('QR generado (previsualización lista)', { type: 'success' })
+                }catch(err){
+                  console.error('[QR] generation failed', err)
+                  // surface server error body when available
+                  const msg = err && (err.data || err.message) || 'Error generando QR'
+                  toast.show(String(msg), { type: 'error' })
+                }finally{ setQrLoading(false) }
+              }} className="px-3 py-2 rounded-lg bg-brand-600 text-white">{qrLoading ? 'Generando...' : 'Generar QR'}</button>
+              <button onClick={()=>{
+                if(!qrUrl){ toast.show('No hay QR generado aún', { type: 'error' }); return }
+                const a = document.createElement('a')
+                a.href = qrUrl
+                const dlId = parseInt(qrMesaInput) || 'qr'
+                a.download = `mesa-${dlId}.png`
+                document.body.appendChild(a)
+                a.click()
+                a.remove()
+              }} className="px-3 py-2 rounded-lg bg-brand-100 text-ink-900">Descargar</button>
+              <button onClick={()=>{ if(qrUrl){ try{ URL.revokeObjectURL(qrUrl) }catch(_){ } setQrUrl(null) } }} className="px-3 py-2 rounded-lg bg-gray-100 text-ink-700">Limpiar</button>
+            </div>
+          </div>
+          {qrUrl ? (
+            <div className="mt-4 flex items-center gap-4">
+              <img src={qrUrl} alt={`QR mesa ${qrMesaInput}`} className="w-48 h-48 object-contain bg-white p-2 border" />
+              <div className="text-sm text-ink-500">Abre en nueva pestaña o descarga el archivo para compartir el QR con el cliente.</div>
+            </div>
+          ) : null}
+
+          {/* Crear mesa */}
+          <div className="mt-6 border-t pt-4">
+            <h4 className="font-semibold">Crear nueva mesa</h4>
+            <p className="text-sm text-ink-500">Crea una mesa con id_mesa, estado y ubicación. El campo codigo_qr se insertará cuando generes el QR.</p>
+            <form onSubmit={async (e)=>{ e.preventDefault();
+              setCreatingMesa(true)
+              try{
+                const payload = {}
+                if(newMesaId !== '') payload.id_mesa = Number(newMesaId)
+                payload.estado = newMesaEstado || 'libre'
+                if(newMesaUbicacion) payload.ubicacion = newMesaUbicacion
+                // Nota: el campo `codigo_qr` ya no se gestiona desde el frontend (se eliminará de la BD)
+                // debug: log the exact JSON payload sent to the backend for mesa creation
+                try{ console.debug('[MESAS] create payload ->', payload) }catch(_){ }
+                const res = await api.post('/api/mesas', payload)
+                try{ console.debug('[MESAS] create response ->', res) }catch(_){ }
+                toast.show('Mesa creada', { type: 'success' })
+                // clear form
+                setNewMesaId('')
+                setNewMesaEstado('libre')
+                setNewMesaUbicacion('')
+              }catch(err){
+                console.error('failed to create mesa', err)
+                const serverMsg = err && (err.data?.error || err.data?.message || err.data) || err.message
+                toast.show(serverMsg || 'Error creando mesa', { type: 'error' })
+              }finally{ setCreatingMesa(false) }
+            }} className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-sm">ID de la mesa</label>
+                <input type="number" min="1" value={newMesaId} onChange={e=>setNewMesaId(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+              </div>
+              <div>
+                <label className="block text-sm">Estado</label>
+                <select value={newMesaEstado} onChange={e=>setNewMesaEstado(e.target.value)} className="w-full border rounded-md px-3 py-2">
+                  <option value="libre">Libre</option>
+                  <option value="ocupada">Ocupada</option>
+                  <option value="reservada">Reservada</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm">Ubicación</label>
+                <input value={newMesaUbicacion} onChange={e=>setNewMesaUbicacion(e.target.value)} className="w-full border rounded-md px-3 py-2" />
+              </div>
+              <div className="md:col-span-3">
+                <div className="flex gap-2 mt-2">
+                  <button type="submit" disabled={creatingMesa} className="px-3 py-2 rounded-lg bg-brand-600 text-white">{creatingMesa ? 'Creando...' : 'Crear mesa'}</button>
+                  <button type="button" onClick={()=>{ setNewMesaId(''); setNewMesaEstado('libre'); setNewMesaUbicacion('') }} className="px-3 py-2 rounded-lg bg-gray-100">Limpiar</button>
+                </div>
+              </div>
+            </form>
+          </div>
         </section>
       )}
 
