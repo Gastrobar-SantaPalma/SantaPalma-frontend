@@ -4,9 +4,10 @@ import SemiProgress from "../components/SemiProgress.jsx";
 import { useCart } from '../store/cart.jsx'
 import { useTable } from '../context/TableContext'
 import { api } from '../api/client.js'
-import { useState, useEffect } from 'react'
 import { useToast } from '../components/Toast.jsx'
 import { useAuth } from '../context/AuthContext'
+import { fetchUserOrders } from "../api/client";
+import { useEffect, useState } from "react";
 
 export default function Orders(){
   const navigate = useNavigate()
@@ -26,6 +27,18 @@ export default function Orders(){
 
 
   const STORAGE_KEY = 'sp_active_order_ts'
+
+  useEffect(() => {
+    if (!user) return;
+
+    const load = async () => {
+      const data = await fetchUserOrders(user.id);
+      setOrders(data);
+    };
+
+    load();
+  }, [user]);
+  
 
   function readStoredTimestamps(){
     try{ const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : {} }catch(e){ return {} }
@@ -157,6 +170,8 @@ export default function Orders(){
     }finally{
       setSubmitting(false)
     }
+    await fetchOrders();
+
   }
 
   useEffect(()=>{
@@ -216,6 +231,8 @@ export default function Orders(){
     const t = setInterval(()=> setNow(Date.now()), 1000)
     return ()=> clearInterval(t)
   }, [])
+
+  
 
   function formatElapsed(createdAt){
     if(!createdAt) return '00:00'
@@ -313,6 +330,45 @@ export default function Orders(){
 
 
       <h3 className="text-xl font-semibold mt-4">Pedidos</h3>
+      {/* LISTADO DE PEDIDOS CONFIRMADOS */}
+<section className="bg-white rounded-2xl p-4 shadow-card mt-4">
+  <h4 className="font-semibold mb-3">Pedidos confirmados</h4>
+
+  {orders.length === 0 && (
+    <p className="text-sm text-ink-500">Todavía no tienes pedidos.</p>
+  )}
+
+  {orders.map(order => (
+    <div
+      key={order.id}
+      className="mb-3 pb-3 border-b last:border-none cursor-pointer"
+      onClick={() => setSelectedOrder(order)} // para ver detalles
+    >
+      <div className="flex justify-between">
+        <div>
+          <div className="font-semibold">Pedido #{order.id}</div>
+          <div className="text-sm text-ink-500">
+            {new Date(order.createdAt).toLocaleString()}
+          </div>
+        </div>
+
+        <div className="text-right">
+          <div className="font-semibold">
+            ${order.total.toLocaleString("es-CO")}
+          </div>
+          <span className={`text-sm px-2 py-1 rounded-full 
+            ${order.status === "preparing" ? "bg-yellow-200 text-yellow-900" : ""}
+            ${order.status === "delivered" ? "bg-green-200 text-green-900" : ""}
+            ${order.status === "created" ? "bg-gray-200 text-gray-800" : ""}
+          `}>
+            {order.status}
+          </span>
+        </div>
+      </div>
+    </div>
+  ))}
+</section>
+
       <p className="text-xs text-ink-500 -mt-1">Solicitudes en curso</p>
 
       <section className="bg-white rounded-2xl p-4 shadow-card">
@@ -326,6 +382,7 @@ export default function Orders(){
               const title = p.nombre || p.name || 'Producto'
               const price = Number(p.precio ?? p.price ?? 0)
               return (
+                
                 <div key={it.id} className="flex items-center gap-3">
                   <img
                     src={img}

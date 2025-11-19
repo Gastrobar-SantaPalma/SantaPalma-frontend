@@ -144,3 +144,15 @@ export default {
   setToken,
   clearToken,
 }
+
+//Devolver pedidos confirmados en listado de pedidos
+export async function fetchUserOrders(userId) {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id, status, payment_state, products, total, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data;
+}
