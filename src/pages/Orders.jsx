@@ -4,9 +4,10 @@ import SemiProgress from "../components/SemiProgress.jsx";
 import { useCart } from '../store/cart.jsx'
 import { useTable } from '../context/TableContext'
 import { api } from '../api/client.js'
-import { useState, useEffect } from 'react'
 import { useToast } from '../components/Toast.jsx'
 import { useAuth } from '../context/AuthContext'
+import { fetchUserOrders } from "../api/client";
+import { useEffect, useState } from "react";
 
 export default function Orders(){
   const navigate = useNavigate()
@@ -21,8 +22,23 @@ export default function Orders(){
   const [submitting, setSubmitting] = useState(false)
   const [showDetails, setShowDetails] = useState(false)
   const [selectedOrder, setSelectedOrder] = useState(null)
+    // control modal de confirmación
+  const [showConfirmModal, setShowConfirmModal] = useState(false)
+
 
   const STORAGE_KEY = 'sp_active_order_ts'
+
+  useEffect(() => {
+    if (!user) return;
+
+    const load = async () => {
+      const data = await fetchUserOrders(user.id);
+      setOrders(data);
+    };
+
+    load();
+  }, [user]);
+  
 
   function readStoredTimestamps(){
     try{ const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : {} }catch(e){ return {} }
@@ -85,6 +101,8 @@ export default function Orders(){
     return true
   }) : []
 
+  
+
   const handleRemove = (id)=>{
     removeItem(id)
   }
@@ -95,6 +113,13 @@ export default function Orders(){
     const next = Math.max(1, (item.cantidad||0) + delta)
     updateQuantity(id, next)
   }
+
+    // cuando el usuario confirma en el modal: cerramos el modal y ejecutamos la confirmación real
+  function handleConfirmModal(){
+    setShowConfirmModal(false)
+    handleConfirm() // reutiliza tu función existente que envía el pedido
+  }
+
 
   async function handleConfirm(){
   if(!cart.items || cart.items.length===0) return toast.show('El carrito está vacío', { type: 'error' })
@@ -145,6 +170,8 @@ export default function Orders(){
     }finally{
       setSubmitting(false)
     }
+    await fetchOrders();
+
   }
 
   useEffect(()=>{
@@ -205,6 +232,8 @@ export default function Orders(){
     return ()=> clearInterval(t)
   }, [])
 
+  
+
   function formatElapsed(createdAt){
     if(!createdAt) return '00:00'
     const ts = Date.parse(createdAt)
@@ -242,6 +271,23 @@ export default function Orders(){
               ¡Ya casi entregamos tu pedido!<br/>
               <span className="text-ink-500">Tiempo transcurrido: {recentOrder ? recentElapsed : '00:00'}</span>
             </p>
+            {recentOrder && (
+              <div className="mt-3 space-y-1">
+                {(recentOrder.items || recentOrder.detalle || []).map((it, idx) => {
+                  const prod = it.product || it
+                  const name = prod.nombre || prod.name || it.nombre || it.name || 'Producto'
+                  const qty = it.cantidad || it.qty || it.quantity || 1
+                  return (
+                    <div key={idx} className="text-sm text-ink-700 flex justify-between">
+                      <span className="font-semibold">{name}</span>
+                      <span className="font-semibold text-ink-500">x{qty}</span>
+
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
             <button onClick={()=>{ if(recentOrder) { setSelectedOrder(recentOrder); setShowDetails(true) } }} className="mt-3 rounded-full bg-brand-500 text-white px-5 py-2 font-semibold">
               Detalles
             </button>
@@ -249,7 +295,80 @@ export default function Orders(){
         </div>
       </section>
 
+            {/* Modal de confirmación inline */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div
+            className="bg-white rounded-2xl p-6 w-[92%] max-w-md text-center shadow-xl"
+            role="dialog"
+            aria-modal="true"
+          >
+            <h2 className="text-xl font-bold mb-4">Confirmar pedido</h2>
+
+            <p className="text-ink-700 mb-6">
+              ¿Estás seguro? Una vez enviado, el pedido pasará a preparación y se cargará a tu cuenta
+            </p>
+
+            <div className="flex gap-3">
+              <button
+                className="flex-1 bg-gray-200 py-2 rounded-full font-semibold hover:bg-gray-300"
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancelar
+              </button>
+
+              <button
+                className="flex-1 bg-brand-500 text-white py-2 rounded-full font-semibold hover:bg-brand-500/90"
+                onClick={handleConfirmModal}
+              >
+                Confirmar pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
       <h3 className="text-xl font-semibold mt-4">Pedidos</h3>
+      {/* LISTADO DE PEDIDOS CONFIRMADOS */}
+<section className="bg-white rounded-2xl p-4 shadow-card mt-4">
+  <h4 className="font-semibold mb-3">Pedidos confirmados</h4>
+
+  {orders.length === 0 && (
+    <p className="text-sm text-ink-500">Todavía no tienes pedidos.</p>
+  )}
+
+  {orders.map(order => (
+    <div
+      key={order.id}
+      className="mb-3 pb-3 border-b last:border-none cursor-pointer"
+      onClick={() => setSelectedOrder(order)} // para ver detalles
+    >
+      <div className="flex justify-between">
+        <div>
+          <div className="font-semibold">Pedido #{order.id}</div>
+          <div className="text-sm text-ink-500">
+            {new Date(order.createdAt).toLocaleString()}
+          </div>
+        </div>
+
+        <div className="text-right">
+          <div className="font-semibold">
+            ${order.total.toLocaleString("es-CO")}
+          </div>
+          <span className={`text-sm px-2 py-1 rounded-full 
+            ${order.status === "preparing" ? "bg-yellow-200 text-yellow-900" : ""}
+            ${order.status === "delivered" ? "bg-green-200 text-green-900" : ""}
+            ${order.status === "created" ? "bg-gray-200 text-gray-800" : ""}
+          `}>
+            {order.status}
+          </span>
+        </div>
+      </div>
+    </div>
+  ))}
+</section>
+
       <p className="text-xs text-ink-500 -mt-1">Solicitudes en curso</p>
 
       <section className="bg-white rounded-2xl p-4 shadow-card">
@@ -263,6 +382,7 @@ export default function Orders(){
               const title = p.nombre || p.name || 'Producto'
               const price = Number(p.precio ?? p.price ?? 0)
               return (
+                
                 <div key={it.id} className="flex items-center gap-3">
                   <img
                     src={img}
@@ -291,9 +411,17 @@ export default function Orders(){
             </div>
 
             <div className="flex gap-3">
-              <button onClick={handleConfirm} disabled={submitting} className="flex-1 rounded-full bg-brand-500 text-white px-5 py-2 font-semibold">{submitting ? 'Enviando...' : 'Confirmar pedido'}</button>
-              <button onClick={()=>clearCart()} className="rounded-full bg-brand-100 text-ink-900 px-5 py-2">Vaciar</button>
+                <button
+                  onClick={() => setShowConfirmModal(true)}
+                  disabled={submitting}
+                  className="flex-1 rounded-full bg-brand-500 text-white px-5 py-2 font-semibold"
+                >
+                  {submitting ? 'Enviando...' : 'Confirmar pedido'}
+                </button>
+
+                <button onClick={() => clearCart()} className="rounded-full bg-brand-100 text-ink-900 px-5 py-2">Vaciar</button>
             </div>
+
           </div>
         )}
       </section>
@@ -378,6 +506,19 @@ export default function Orders(){
               <div className="text-sm text-ink-700">Total</div>
               <div className="text-lg font-semibold">${Number(selectedOrder.total || selectedOrder.total_price || selectedOrder.precio_total || 0).toLocaleString('es-CO')}</div>
             </div>
+            <div className="mt-6">
+            <button
+              className="w-full rounded-full bg-brand-500 text-white px-5 py-3 font-semibold text-center"
+              onClick={() => {
+                // Ir al checkout preview para pagar el pedido
+                navigate("/checkout")
+                console.log("Pagar pedido", selectedOrder);
+              }}
+            >
+              Pagar
+            </button>
+          </div>
+
           </div>
         </div>
       ) : null}

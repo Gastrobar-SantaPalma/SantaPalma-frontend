@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { setToken as apiSetToken, clearToken as apiClearToken } from '../api/client.js'
+// Importamos el objeto completo exportado por defecto (ClientAPI)
+import ClientAPI from '../api/client.js' 
+
+// Desestructuramos las funciones del objeto importado y les damos el alias
+// para que el resto de tu código (apiSetToken, apiClearToken) siga funcionando.
+const { api, setToken: apiSetToken, clearToken: apiClearToken } = ClientAPI
 
 const AuthContext = createContext(null)
 

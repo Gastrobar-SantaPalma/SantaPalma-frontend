@@ -1,10 +1,16 @@
 // Use relative paths in development so Vite's proxy can forward /api to the backend
 // In production, prefer VITE_BACKEND_URL if provided.
-const BASE = (import.meta.env.MODE === 'development') ? '' : (import.meta.env.VITE_BACKEND_URL || '')
+const BASE =
+  import.meta.env.MODE === "development"
+    ? "http://localhost:4000" 
+    : import.meta.env.VITE_BACKEND_URL || "";
+
 
 let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
-export function setToken(t){
+// ESTA DEFINICIÓN ESTABA FALTANDO (o se perdió en el conflicto)
+// La restauramos para que sea accesible en todo el archivo.
+export function setToken(t){ 
   // Accept either a raw token string or an object containing the token in several possible shapes.
   let final = t
   if (final && typeof final === 'object') {
@@ -21,6 +27,7 @@ export function setToken(t){
   if(typeof window !== 'undefined') localStorage.setItem('token', final)
 }
 
+// ESTA DEFINICIÓN ESTABA FALTANDO (o se perdió en el conflicto)
 export function clearToken(){
   token = null
   if(typeof window !== 'undefined') localStorage.removeItem('token')
@@ -136,4 +143,16 @@ export default {
   apiBlob,
   setToken,
   clearToken,
+}
+
+//Devolver pedidos confirmados en listado de pedidos
+export async function fetchUserOrders(userId) {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("id, status, payment_state, products, total, created_at")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data;
 }
