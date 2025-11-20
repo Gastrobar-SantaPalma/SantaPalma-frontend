@@ -479,7 +479,7 @@ export default function Account(){
         return
       }
 
-      // try PATCH first (backend expects PATCH /api/pedidos/:id/estado with JSON { estado })
+      // try PATCH first (preferred)
       try{
         await api.patch(`/api/pedidos/${id}/estado`, { estado: target })
       }catch(patchErr){
@@ -488,8 +488,21 @@ export default function Account(){
         try{
           await api.put(`/api/pedidos/${id}/estado`, { estado: target })
         }catch(putErr){
-          // rethrow original patch error if put also fails to preserve server message when available
-          throw patchErr || putErr
+          console.warn('PUT fallback also failed, attempting POST fallback', putErr)
+          // As a last resort try POST (some backends expose POST endpoints)
+          try{
+            await api.post(`/api/pedidos/${id}/estado`, { estado: target })
+          }catch(postErr){
+            // If all methods failed, enhance error message for network/CORS issues
+            console.error('All method fallbacks failed for updating order status', { patchErr, putErr, postErr })
+            // If the failure appears to be a network-level 'Failed to fetch', give a clearer hint
+            const isNetwork = [patchErr, putErr, postErr].some(e => e && (String(e.message || '').toLowerCase().includes('failed to fetch') || String(e.message || '').toLowerCase().includes('networkrequestfailed')))
+            if(isNetwork){
+              toast.show('Error de red al actualizar el pedido. Es probable que el servidor no permita solicitudes desde este origen (CORS) o que la petición sea bloqueada por preflight. Revisa la configuración CORS en el backend.', { type: 'error', timeout: 8000 })
+            }
+            // rethrow the most informative error
+            throw postErr || putErr || patchErr
+          }
         }
       }
       toast.show('Estado actualizado', { type: 'success' })
