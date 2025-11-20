@@ -1,9 +1,9 @@
-// Use relative paths in development so Vite's proxy can forward /api to the backend
-// In production, prefer VITE_BACKEND_URL if provided.
-const BASE =
-  import.meta.env.MODE === "development"
-    ? "http://localhost:4000" 
-    : import.meta.env.VITE_BACKEND_URL || "";
+// Resolve the backend base URL.
+// Priority:
+// 1) `import.meta.env.VITE_BACKEND_URL` when explicitly provided (useful for direct backend during dev or production builds)
+// 2) In development, use empty string so requests use relative `/api` and Vite's dev server proxy forwards them to the backend
+// 3) Otherwise default to empty string (relative paths)
+const BASE = import.meta.env.VITE_BACKEND_URL || (import.meta.env.MODE === 'development' ? '' : '')
 
 
 let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
