@@ -6,7 +6,7 @@ import { useTable } from '../context/TableContext'
 import { api } from '../api/client.js'
 import { useToast } from '../components/Toast.jsx'
 import { useAuth } from '../context/AuthContext'
-import { fetchUserOrders } from "../api/client";
+
 import { useEffect, useState } from "react";
 
 export default function Orders(){
@@ -28,16 +28,7 @@ export default function Orders(){
 
   const STORAGE_KEY = 'sp_active_order_ts'
 
-  useEffect(() => {
-    if (!user) return;
-
-    const load = async () => {
-      const data = await fetchUserOrders(user.id);
-      setOrders(data);
-    };
-
-    load();
-  }, [user]);
+  
   
 
   function readStoredTimestamps(){
@@ -68,8 +59,8 @@ export default function Orders(){
   ])
 
   const historial = Array.isArray(orders) ? orders.filter(o=>{
-    const st = String(o.estado || o.status || o.estado_pedido || o.state || '').toLowerCase()
-    if(!finalizedStatuses.has(st)) return false
+    
+    
     // try to match by client id first
     if(clientId){
       const oid = o.id_cliente || o.cliente?.id_usuario || o.cliente?.id || o.user_id || o.id_usuario || o.cliente_id || o.customer_id || o.customer?.id
@@ -82,6 +73,21 @@ export default function Orders(){
     }
     // no client in session: show finalized orders (admin or public view)
     return true
+  }) : []
+
+  // Filtrar los pedidos para obtener solo los del día actual
+  const hoyInicio = new Date()
+  hoyInicio.setHours(0, 0, 0, 0)
+
+  const pedidosDelDia = Array.isArray(orders) ? orders.filter(o => {
+    if(clientId){
+      const oid = o.id_cliente || o.cliente?.id_usuario || o.cliente?.id || o.user_id || o.id_usuario || o.cliente_id
+      if(oid != null && String(oid) !== String(clientId)) return false
+    }
+    const fechaPedido = o.fecha_pedido || o.fecha || o.createdAt || o.created_at
+    if (!fechaPedido) return false
+    const pedidoDate = new Date(fechaPedido)
+    return pedidoDate >= hoyInicio
   }) : []
 
   // orders to show to the current user / mesa (includes active and finalized)
@@ -134,6 +140,9 @@ export default function Orders(){
         items
       }
       const res = await api.post('/api/pedidos', payload)
+      console.log(payload);
+      
+
       // success: clear cart and update orders immediately so the tracker updates
       clearCart()
       toast.show('Pedido creado con éxito', { type: 'success' })
@@ -170,54 +179,75 @@ export default function Orders(){
     }finally{
       setSubmitting(false)
     }
-    await fetchOrders();
+    await loadOrders();
+    
 
   }
 
+  async function loadOrders(){
+  setLoadingOrders(true)
+  try{
+    let res 
+    
+    const userId = user?.id || user?._id;
+
+    // Construcción de la ruta dedicada
+    let path = '/api/pedidos';
+
+    // Si el usuario es un cliente, usamos la ruta dedicada
+    if (user && user.rol === 'cliente') {
+      path = '/api/pedidos/cliente/mis-pedidos' 
+    }
+
+    console.log('[loadOrders] Usando ruta:', path, 'para usuario:', user?.rol);
+
+    // Realizamos la petición con la ruta determinada
+    res = await api.get(path)
+
+    console.log('[loadOrders] Respuesta recibida:', res);
+
+    // accept multiple shapes
+    let arr = []
+    if(res){
+      if(Array.isArray(res)) arr = res
+      else if(res.pedidos && Array.isArray(res.pedidos)) arr = res.pedidos
+      else if(res.orders && Array.isArray(res.orders)) arr = res.orders
+      else if(res.data && Array.isArray(res.data)) arr = res.data
+    }
+
+    // merge stored timestamps
+    try{
+      const map = readStoredTimestamps()
+      arr = Array.isArray(arr) ? arr.map(it=>{
+        const id = it.id_pedido || it.id || it._id
+        if((!it.createdAt && !it.fecha && !it.created_at) && id && map[String(id)]){
+          return { ...it, createdAt: map[String(id)] }
+        }
+        return it
+      }) : arr
+    }catch(e){ /* ignore */ }
+
+    setOrders(Array.isArray(arr) ? arr : [])
+
+    // cleanup stored timestamps for finalized orders
+    try{
+      const finalSet = new Set(['entregado','entregada','delivered','served','servido','completado','completed','finalizado','finalizada','cancelado','cancelada','cancelled','canceled'])
+      ;(Array.isArray(arr) ? arr : []).forEach(it=>{
+        const st = String(it.estado || it.status || it.estado_pedido || it.state || '').toLowerCase()
+        const id = it.id_pedido || it.id || it._id
+        if(id && finalSet.has(st)) removeStoredTimestamp(id)
+      })
+    }catch(e){ /* ignore */ }
+  }catch(e){
+    console.error('failed to load orders', e)
+    setOrdersError(e)
+  }finally{
+    setLoadingOrders(false)
+  }
+}
   useEffect(()=>{
     let mounted = true
-    async function loadOrders(){
-      setLoadingOrders(true)
-      try{
-        const res = await api.get('/api/pedidos')
-        // accept multiple shapes: { pedidos: [...] } | { orders: [...] } | array | { data: [...] }
-        let arr = []
-        if(res){
-          if(Array.isArray(res)) arr = res
-          else if(res.pedidos && Array.isArray(res.pedidos)) arr = res.pedidos
-          else if(res.orders && Array.isArray(res.orders)) arr = res.orders
-          else if(res.data && Array.isArray(res.data)) arr = res.data
-        }
-        // merge stored timestamps for newly created orders so timers survive reloads
-        try{
-          const map = readStoredTimestamps()
-          arr = Array.isArray(arr) ? arr.map(it=>{
-            const id = it.id_pedido || it.id || it._id
-            if((!it.createdAt && !it.fecha && !it.created_at) && id && map[String(id)]){
-              return { ...it, createdAt: map[String(id)] }
-            }
-            return it
-          }) : arr
-        }catch(e){ /* ignore */ }
-        if(mounted){
-          setOrders(Array.isArray(arr) ? arr : [])
-          // cleanup stored timestamps for finalized orders
-          try{
-            const finalSet = new Set(['entregado','entregada','delivered','served','servido','completado','completed','finalizado','finalizada','cancelado','cancelada','cancelled','canceled'])
-            ;(Array.isArray(arr) ? arr : []).forEach(it=>{
-              const st = String(it.estado || it.status || it.estado_pedido || it.state || '').toLowerCase()
-              const id = it.id_pedido || it.id || it._id
-              if(id && finalSet.has(st)) removeStoredTimestamp(id)
-            })
-          }catch(e){ /* ignore */ }
-        }
-      }catch(e){
-        console.error('failed to load orders', e)
-        if(mounted) setOrdersError(e)
-      }finally{
-        if(mounted) setLoadingOrders(false)
-      }
-    }
+    
     loadOrders()
     return ()=>{ mounted = false }
   }, [])
@@ -329,39 +359,42 @@ export default function Orders(){
       )}
 
 
-      <h3 className="text-xl font-semibold mt-4">Pedidos</h3>
-      {/* LISTADO DE PEDIDOS CONFIRMADOS */}
-<section className="bg-white rounded-2xl p-4 shadow-card mt-4">
-  <h4 className="font-semibold mb-3">Pedidos confirmados</h4>
 
-  {orders.length === 0 && (
-    <p className="text-sm text-ink-500">Todavía no tienes pedidos.</p>
+      
+
+      <h3 className="text-xl font-semibold mt-4">Pedidos</h3>
+      {/* LISTADO DE PEDIDOS DEL DÍA */}
+<section className="bg-white rounded-2xl p-4 shadow-card mt-4">
+  <h4 className="font-semibold mb-3">Pedidos de hoy</h4>
+
+  {pedidosDelDia.length === 0 && (
+    <p className="text-sm text-ink-500">No tienes pedidos hoy.</p>
   )}
 
-  {orders.map(order => (
+  {pedidosDelDia.map(order => (  // ← Ahora usa "pedidosDelDia"
     <div
-      key={order.id}
+      key={order.id_pedido || order.id || order._id}
       className="mb-3 pb-3 border-b last:border-none cursor-pointer"
-      onClick={() => setSelectedOrder(order)} // para ver detalles
+      onClick={() => { setSelectedOrder(order); setShowDetails(true); }}
     >
       <div className="flex justify-between">
         <div>
-          <div className="font-semibold">Pedido #{order.id}</div>
+          <div className="font-semibold">Pedido #{order.id_pedido || order.id}</div>
           <div className="text-sm text-ink-500">
-            {new Date(order.createdAt).toLocaleString()}
+            {formatDate(order.fecha_pedido || order.createdAt || order.created_at || order.fecha)}
           </div>
         </div>
 
         <div className="text-right">
           <div className="font-semibold">
-            ${order.total.toLocaleString("es-CO")}
+            ${Number(order.total).toLocaleString("es-CO")}
           </div>
           <span className={`text-sm px-2 py-1 rounded-full 
-            ${order.status === "preparing" ? "bg-yellow-200 text-yellow-900" : ""}
-            ${order.status === "delivered" ? "bg-green-200 text-green-900" : ""}
-            ${order.status === "created" ? "bg-gray-200 text-gray-800" : ""}
+            ${(order.estado || order.status) === "preparando" || (order.estado || order.status) === "preparing" ? "bg-yellow-200 text-yellow-900" : ""}
+            ${(order.estado || order.status) === "entregado" || (order.estado || order.status) === "delivered" ? "bg-green-200 text-green-900" : ""}
+            ${(order.estado || order.status) === "pendiente" || (order.estado || order.status) === "created" ? "bg-gray-200 text-gray-800" : ""}
           `}>
-            {order.status}
+            {order.estado || order.status}
           </span>
         </div>
       </div>
@@ -468,6 +501,8 @@ export default function Orders(){
   )}
       </section>
 
+      
+
       <div className="h-10" />
       {/* Details modal */}
       {showDetails && selectedOrder ? (
@@ -524,4 +559,5 @@ export default function Orders(){
       ) : null}
     </div>
   );
+  
 }

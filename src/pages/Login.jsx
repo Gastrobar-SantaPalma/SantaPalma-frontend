@@ -59,11 +59,14 @@ export default function Login() {
         correo: formLogin.get('email'),
         contrasena: formLogin.get('password')
       }
+      console.log("ENVIANDO PAYLOAD:", payload);
   const res = await api.post('/api/usuarios/login', payload, { credentials: 'omit', noAuth: true })
   // prefer passing the whole response to login() so context can store user if provided
   login(res)
       nav('/home')
     }catch(err){
+      
+
       // show richer error information (status + body) when available
       console.error('auth error', err)
       const message = err && (err.data?.message || err.message || JSON.stringify(err.data) || 'Error')
