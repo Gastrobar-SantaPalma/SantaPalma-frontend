@@ -116,7 +116,9 @@ export default function Account(){
           // Try to extract ID from token if available
           let uid = null
           try{
-            const base64Url = token.split('.')[1]
+            const parts = token.split('.')
+            if(parts.length !== 3) throw new Error('Invalid token format')
+            const base64Url = parts[1]
             const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
             const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''))
             const decoded = JSON.parse(jsonPayload)
@@ -128,7 +130,7 @@ export default function Account(){
           } else {
              // fallback: if we can't get ID, we can't fetch user details.
              // throw error to trigger logout/redirect
-             throw new Error('No user ID available from token')
+             throw new Error('Unable to load user profile. Please log in again.')
           }
         }catch(err){
           throw err
@@ -592,7 +594,7 @@ export default function Account(){
       const formData = new FormData()
       formData.append('nombre', prodNombre)
       formData.append('descripcion', prodDescripcion)
-      formData.append('precio', prodPrecio ? Number(prodPrecio) : 0)
+      formData.append('precio', (prodPrecio ? Number(prodPrecio) : 0).toString())
       formData.append('disponible', prodDisponible ? 'true' : 'false')
       if(prodCategoria) formData.append('id_categoria', prodCategoria)
       if(prodImageUrl) formData.append('imagen_url', prodImageUrl)
@@ -671,7 +673,7 @@ export default function Account(){
       const formData = new FormData()
       formData.append('nombre', editProdNombre)
       formData.append('descripcion', editProdDescripcion)
-      formData.append('precio', editProdPrecio ? Number(editProdPrecio) : 0)
+      formData.append('precio', (editProdPrecio ? Number(editProdPrecio) : 0).toString())
       formData.append('disponible', editProdDisponible ? 'true' : 'false')
       if(editProdCategoria) formData.append('id_categoria', editProdCategoria)
       if(editProdImageUrl) formData.append('imagen_url', editProdImageUrl)
