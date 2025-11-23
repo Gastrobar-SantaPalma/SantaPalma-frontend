@@ -113,25 +113,9 @@ export default function Account(){
         // fetch user profile using token; avoid sending cookies
         let res = null
         try{
-          // Try to extract ID from token if available
-          let uid = null
-          try{
-            const parts = token.split('.')
-            if(parts.length !== 3) throw new Error('Invalid token format')
-            const base64Url = parts[1]
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-            const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''))
-            const decoded = JSON.parse(jsonPayload)
-            uid = decoded.id || decoded.id_usuario || decoded.sub
-          }catch(e){ /* ignore decode error */ }
-          
-          if(uid){
-             res = await api.get(`/api/usuarios/${uid}`, { credentials: 'omit' })
-          } else {
-             // fallback: if we can't get ID, we can't fetch user details.
-             // throw error to trigger logout/redirect
-             throw new Error('Unable to load user profile. Please log in again.')
-          }
+          // Use the new /api/auth/me endpoint to get the current user profile
+          // This avoids manual token decoding on the client side
+          res = await api.get('/api/auth/me', { credentials: 'omit' })
         }catch(err){
           throw err
         }
