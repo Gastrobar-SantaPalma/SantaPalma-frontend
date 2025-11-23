@@ -579,7 +579,7 @@ export default function Account(){
       formData.append('precio', (prodPrecio ? Number(prodPrecio) : 0).toString())
       formData.append('disponible', prodDisponible ? 'true' : 'false')
       if(prodCategoria != null && prodCategoria !== '') formData.append('id_categoria', String(prodCategoria))
-      if(prodImageUrl != null && prodImageUrl !== '') formData.append('imagen_url', prodImageUrl)
+      if(prodImageUrl != null && prodImageUrl !== '') formData.append('imagen_url', String(prodImageUrl))
 
       try{
         // client-side duplicate name check to avoid server 'already exists' error
@@ -660,7 +660,7 @@ export default function Account(){
       formData.append('precio', (editProdPrecio ? Number(editProdPrecio) : 0).toString())
       formData.append('disponible', editProdDisponible ? 'true' : 'false')
       if(editProdCategoria != null && editProdCategoria !== '') formData.append('id_categoria', String(editProdCategoria))
-      if(editProdImageUrl != null && editProdImageUrl !== '') formData.append('imagen_url', editProdImageUrl)
+      if(editProdImageUrl != null && editProdImageUrl !== '') formData.append('imagen_url', String(editProdImageUrl))
 
       await api.put(`/api/productos/${id}`, formData)
       toast.show('Producto actualizado', { type: 'success' })
