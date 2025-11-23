@@ -19,12 +19,11 @@ export default function Login() {
     try{
       const form = new FormData(e.target)
       if(tab === 'signup'){
-        // Signup inline: send nombre, correo, contrasena and role cliente
+        // Signup inline: send nombre, correo, contrasena
         const payload = {
           nombre: form.get('nombre'),
           correo: form.get('email'),
-          contrasena: form.get('password'),
-          rol: 'cliente'
+          contrasena: form.get('password')
         }
         const res = await api.post('/api/auth/signup', payload, { credentials: 'omit', noAuth: true })
         // backend might return a token string or an object containing the token/user.

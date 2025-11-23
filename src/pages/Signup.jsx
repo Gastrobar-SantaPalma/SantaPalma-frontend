@@ -30,12 +30,11 @@ export default function Signup(){
     setError(null)
     setLoading(true)
     try{
-      // Only send fields supported by the backend (nombre, correo, contrasena, rol)
+      // Only send fields supported by the backend (nombre, correo, contrasena)
       const payload = {
         nombre: data.nombre,
         correo: data.correo,
-        contrasena: data.contrasena,
-        rol: 'cliente'
+        contrasena: data.contrasena
       }
       const res = await api.post('/api/auth/signup', payload, { credentials: 'omit', noAuth: true })
       if (import.meta.env.MODE === 'development') {

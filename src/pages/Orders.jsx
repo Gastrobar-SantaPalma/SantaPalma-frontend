@@ -133,7 +133,7 @@ export default function Orders(){
     try{
       // Build payload according to backend expected shape
       const items = cart.items.map(i=>({ id_producto: i.product.id || i.product.id_producto || i.product.idProduct, cantidad: i.cantidad }))
-      const clienteId = user && (user.id_usuario || user.id || user._id || user.id_cliente) ? (user.id_usuario || user.id || user._id || user.id_cliente) : undefined
+      const clienteId = user && (user.id_usuario || user.id || user._id || user.id_cliente) ? String(user.id_usuario || user.id || user._id || user.id_cliente) : undefined
       const payload = {
         ...(mesa && mesa.mesaId ? { id_mesa: mesa.mesaId } : {}),
         ...(clienteId ? { id_cliente: clienteId } : {}),
