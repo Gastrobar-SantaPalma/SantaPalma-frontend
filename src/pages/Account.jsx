@@ -578,10 +578,12 @@ export default function Account(){
       const formData = new FormData()
       formData.append('nombre', prodNombre)
       formData.append('descripcion', prodDescripcion)
+      // NOTE: FormData only supports strings, so 'precio' (number) and 'disponible' (boolean) are sent as strings.
+      // The backend must parse these fields to their expected types (Number for 'precio', Boolean for 'disponible').
       formData.append('precio', (prodPrecio ? Number(prodPrecio) : 0).toString())
       formData.append('disponible', prodDisponible ? 'true' : 'false')
-      if(prodCategoria) formData.append('id_categoria', prodCategoria)
-      if(prodImageUrl) formData.append('imagen_url', prodImageUrl)
+      if(prodCategoria != null && prodCategoria !== '') formData.append('id_categoria', prodCategoria)
+      if(prodImageUrl != null && prodImageUrl !== '') formData.append('imagen_url', prodImageUrl)
 
       try{
         // client-side duplicate name check to avoid server 'already exists' error
@@ -594,7 +596,7 @@ export default function Account(){
           }
         }
 
-        await api.post('/api/productos', formData)
+        const res = await api.post('/api/productos', formData)
         toast.show('Producto creado', { type: 'success' })
         setCreateOpen(false)
         try{ await loadProducts() }catch(_){ /* ignore */ }
@@ -657,10 +659,12 @@ export default function Account(){
       const formData = new FormData()
       formData.append('nombre', editProdNombre)
       formData.append('descripcion', editProdDescripcion)
+      // NOTE: FormData only supports strings, so 'precio' (number) and 'disponible' (boolean) are sent as strings.
+      // The backend must parse these fields to their expected types (Number for 'precio', Boolean for 'disponible').
       formData.append('precio', (editProdPrecio ? Number(editProdPrecio) : 0).toString())
       formData.append('disponible', editProdDisponible ? 'true' : 'false')
-      if(editProdCategoria) formData.append('id_categoria', editProdCategoria)
-      if(editProdImageUrl) formData.append('imagen_url', editProdImageUrl)
+      if(editProdCategoria != null && editProdCategoria !== '') formData.append('id_categoria', editProdCategoria)
+      if(editProdImageUrl != null && editProdImageUrl !== '') formData.append('imagen_url', editProdImageUrl)
 
       await api.put(`/api/productos/${id}`, formData)
       toast.show('Producto actualizado', { type: 'success' })
