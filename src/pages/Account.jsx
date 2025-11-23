@@ -115,15 +115,13 @@ export default function Account(){
         try{
           // Try to extract ID from token if available
           let uid = null
-          if(token){
-            try{
-              const base64Url = token.split('.')[1]
-              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-              const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''))
-              const decoded = JSON.parse(jsonPayload)
-              uid = decoded.id || decoded.id_usuario || decoded.sub
-            }catch(e){ /* ignore decode error */ }
-          }
+          try{
+            const base64Url = token.split('.')[1]
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+            const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''))
+            const decoded = JSON.parse(jsonPayload)
+            uid = decoded.id || decoded.id_usuario || decoded.sub
+          }catch(e){ /* ignore decode error */ }
           
           if(uid){
              res = await api.get(`/api/usuarios/${uid}`, { credentials: 'omit' })
@@ -595,7 +593,7 @@ export default function Account(){
       formData.append('nombre', prodNombre)
       formData.append('descripcion', prodDescripcion)
       formData.append('precio', prodPrecio ? Number(prodPrecio) : 0)
-      formData.append('disponible', Boolean(prodDisponible))
+      formData.append('disponible', prodDisponible ? 'true' : 'false')
       if(prodCategoria) formData.append('id_categoria', prodCategoria)
       if(prodImageUrl) formData.append('imagen_url', prodImageUrl)
 
@@ -610,7 +608,7 @@ export default function Account(){
           }
         }
 
-        const res = await api.post('/api/productos', formData)
+        await api.post('/api/productos', formData)
         toast.show('Producto creado', { type: 'success' })
         setCreateOpen(false)
         try{ await loadProducts() }catch(_){ /* ignore */ }
@@ -674,7 +672,7 @@ export default function Account(){
       formData.append('nombre', editProdNombre)
       formData.append('descripcion', editProdDescripcion)
       formData.append('precio', editProdPrecio ? Number(editProdPrecio) : 0)
-      formData.append('disponible', Boolean(editProdDisponible))
+      formData.append('disponible', editProdDisponible ? 'true' : 'false')
       if(editProdCategoria) formData.append('id_categoria', editProdCategoria)
       if(editProdImageUrl) formData.append('imagen_url', editProdImageUrl)
 
