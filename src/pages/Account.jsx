@@ -113,14 +113,27 @@ export default function Account(){
         // fetch user profile using token; avoid sending cookies
         let res = null
         try{
-          res = await api.get('/api/usuarios/me', { credentials: 'omit' })
-        }catch(err){
-          // if the endpoint is not found, try a common alternative under /api/auth/me
-          if(err && err.status === 404){
-            try{ res = await api.get('/api/auth/me', { credentials: 'omit' }) }catch(err2){ throw err }
-          }else{
-            throw err
+          // Try to extract ID from token if available
+          let uid = null
+          if(token){
+            try{
+              const base64Url = token.split('.')[1]
+              const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+              const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''))
+              const decoded = JSON.parse(jsonPayload)
+              uid = decoded.id || decoded.id_usuario || decoded.sub
+            }catch(e){ /* ignore decode error */ }
           }
+          
+          if(uid){
+             res = await api.get(`/api/usuarios/${uid}`, { credentials: 'omit' })
+          } else {
+             // fallback: if we can't get ID, we can't fetch user details.
+             // throw error to trigger logout/redirect
+             throw new Error('No user ID available from token')
+          }
+        }catch(err){
+          throw err
         }
 
         // Normalize response shapes: accept { user } | { usuario } | { data: { user } } | direct user object
@@ -577,19 +590,18 @@ export default function Account(){
     e.preventDefault()
     setCreating(true)
     try{
-      // send JSON payload (backend expects fields in body for create)
-      const payload = {
-        nombre: prodNombre,
-        descripcion: prodDescripcion,
-        precio: prodPrecio ? Number(prodPrecio) : 0,
-        disponible: Boolean(prodDisponible),
-      }
-      if(prodCategoria) payload.id_categoria = prodCategoria
-      if(prodImageUrl) payload.imagen_url = prodImageUrl
+      // send FormData payload (backend expects multipart/form-data)
+      const formData = new FormData()
+      formData.append('nombre', prodNombre)
+      formData.append('descripcion', prodDescripcion)
+      formData.append('precio', prodPrecio ? Number(prodPrecio) : 0)
+      formData.append('disponible', Boolean(prodDisponible))
+      if(prodCategoria) formData.append('id_categoria', prodCategoria)
+      if(prodImageUrl) formData.append('imagen_url', prodImageUrl)
 
       try{
         // client-side duplicate name check to avoid server 'already exists' error
-        const nameNorm = (payload.nombre || '').toString().trim().toLowerCase()
+        const nameNorm = (prodNombre || '').toString().trim().toLowerCase()
         if(nameNorm){
           const dup = products.find(p=> ((p.nombre||p.name||'').toString().trim().toLowerCase()) === nameNorm)
           if(dup){
@@ -598,7 +610,7 @@ export default function Account(){
           }
         }
 
-        const res = await api.post('/api/productos', payload)
+        const res = await api.post('/api/productos', formData)
         toast.show('Producto creado', { type: 'success' })
         setCreateOpen(false)
         try{ await loadProducts() }catch(_){ /* ignore */ }
@@ -657,17 +669,16 @@ export default function Account(){
           return
         }
       }
-      // send JSON payload for update (backend should treat this as update)
-      const payload = {
-        nombre: editProdNombre,
-        descripcion: editProdDescripcion,
-        precio: editProdPrecio ? Number(editProdPrecio) : 0,
-        disponible: Boolean(editProdDisponible),
-      }
-      if(editProdCategoria) payload.id_categoria = editProdCategoria
-      if(editProdImageUrl) payload.imagen_url = editProdImageUrl
+      // send FormData payload for update
+      const formData = new FormData()
+      formData.append('nombre', editProdNombre)
+      formData.append('descripcion', editProdDescripcion)
+      formData.append('precio', editProdPrecio ? Number(editProdPrecio) : 0)
+      formData.append('disponible', Boolean(editProdDisponible))
+      if(editProdCategoria) formData.append('id_categoria', editProdCategoria)
+      if(editProdImageUrl) formData.append('imagen_url', editProdImageUrl)
 
-      await api.put(`/api/productos/${id}`, payload)
+      await api.put(`/api/productos/${id}`, formData)
       toast.show('Producto actualizado', { type: 'success' })
       closeEditProduct()
       try{ await loadProducts() }catch(_){ }
