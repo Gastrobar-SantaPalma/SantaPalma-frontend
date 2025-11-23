@@ -112,13 +112,9 @@ export default function Account(){
 
         // fetch user profile using token; avoid sending cookies
         let res = null
-        try{
-          // Use the new /api/auth/me endpoint to get the current user profile
-          // This avoids manual token decoding on the client side
-          res = await api.get('/api/auth/me', { credentials: 'omit' })
-        }catch(err){
-          throw err
-        }
+        // Use the new /api/auth/me endpoint to get the current user profile
+        // This avoids manual token decoding on the client side
+        res = await api.get('/api/auth/me', { credentials: 'omit' })
 
         // Normalize response shapes: accept { user } | { usuario } | { data: { user } } | direct user object
         const normalized = res && (res.user || res.usuario || (res.data && (res.data.user || res.data.usuario)) || res)
@@ -582,7 +578,7 @@ export default function Account(){
       // The backend must parse these fields to their expected types (Number for 'precio', Boolean for 'disponible').
       formData.append('precio', (prodPrecio ? Number(prodPrecio) : 0).toString())
       formData.append('disponible', prodDisponible ? 'true' : 'false')
-      if(prodCategoria != null && prodCategoria !== '') formData.append('id_categoria', prodCategoria)
+      if(prodCategoria != null && prodCategoria !== '') formData.append('id_categoria', String(prodCategoria))
       if(prodImageUrl != null && prodImageUrl !== '') formData.append('imagen_url', prodImageUrl)
 
       try{
@@ -596,7 +592,7 @@ export default function Account(){
           }
         }
 
-        const res = await api.post('/api/productos', formData)
+        await api.post('/api/productos', formData)
         toast.show('Producto creado', { type: 'success' })
         setCreateOpen(false)
         try{ await loadProducts() }catch(_){ /* ignore */ }
@@ -663,7 +659,7 @@ export default function Account(){
       // The backend must parse these fields to their expected types (Number for 'precio', Boolean for 'disponible').
       formData.append('precio', (editProdPrecio ? Number(editProdPrecio) : 0).toString())
       formData.append('disponible', editProdDisponible ? 'true' : 'false')
-      if(editProdCategoria != null && editProdCategoria !== '') formData.append('id_categoria', editProdCategoria)
+      if(editProdCategoria != null && editProdCategoria !== '') formData.append('id_categoria', String(editProdCategoria))
       if(editProdImageUrl != null && editProdImageUrl !== '') formData.append('imagen_url', editProdImageUrl)
 
       await api.put(`/api/productos/${id}`, formData)
