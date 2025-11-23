@@ -1,4 +1,3 @@
-
 import { useNavigate } from 'react-router-dom'
 import SemiProgress from "../components/SemiProgress.jsx";
 import { useCart } from '../store/cart.jsx'
@@ -8,6 +7,24 @@ import { useToast } from '../components/Toast.jsx'
 import { useAuth } from '../context/AuthContext'
 
 import { useEffect, useState } from "react";
+
+const StarRating = ({ value, onChange, readOnly = false }) => {
+  return (
+    <div className="flex gap-1">
+      {[1, 2, 3, 4, 5].map((star) => (
+        <button
+          key={star}
+          type="button"
+          disabled={readOnly}
+          onClick={() => !readOnly && onChange && onChange(star)}
+          className={`text-2xl ${star <= value ? 'text-yellow-400' : 'text-gray-300'} focus:outline-none transition-colors`}
+        >
+          ★
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export default function Orders(){
   const navigate = useNavigate()
@@ -24,6 +41,13 @@ export default function Orders(){
   const [selectedOrder, setSelectedOrder] = useState(null)
     // control modal de confirmación
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+
+  // Estado para calificación
+  const [showRateModal, setShowRateModal] = useState(false)
+  const [ratingProduct, setRatingProduct] = useState(null)
+  const [ratingValue, setRatingValue] = useState(5)
+  const [ratingComment, setRatingComment] = useState("")
+  const [submittingRating, setSubmittingRating] = useState(false)
 
 
   const STORAGE_KEY = 'sp_active_order_ts'
@@ -184,11 +208,44 @@ export default function Orders(){
 
   }
 
+  const openRateModal = (product) => {
+    setRatingProduct(product)
+    setRatingValue(5)
+    setRatingComment("")
+    setShowRateModal(true)
+  }
+
+  const handleRateSubmit = async () => {
+    if(!ratingProduct) return
+    setSubmittingRating(true)
+    try {
+        const productId = ratingProduct.id || ratingProduct.id_producto || ratingProduct.idProduct
+        // Clean ID if necessary
+        const cleanId = String(productId).replace(/^:/, '')
+        
+        await api.post(`/api/productos/${cleanId}/calificacion`, {
+            puntuacion: ratingValue,
+            comentario: ratingComment
+        })
+        toast.show('Calificación enviada con éxito', { type: 'success' })
+        setShowRateModal(false)
+    } catch (e) {
+        console.error(e)
+        const msg = e.data?.message || e.message || 'Error al enviar calificación'
+        if(e.status === 403) {
+            toast.show('Debes haber comprado y pagado este producto para calificarlo', { type: 'error' })
+        } else {
+            toast.show(msg, { type: 'error' })
+        }
+    } finally {
+        setSubmittingRating(false)
+    }
+  }
+
   async function loadOrders(){
   setLoadingOrders(true)
   try{
     let res 
-    
     const userId = user?.id || user?._id;
 
     // Construcción de la ruta dedicada
@@ -352,6 +409,43 @@ export default function Orders(){
                 onClick={handleConfirmModal}
               >
                 Confirmar pedido
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de calificación */}
+      {showRateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-[92%] max-w-md text-center shadow-xl">
+            <h2 className="text-xl font-bold mb-4">Calificar producto</h2>
+
+            <div className="mb-4">
+              <StarRating value={ratingValue} onChange={setRatingValue} />
+            </div>
+
+            <textarea
+              value={ratingComment}
+              onChange={(e) => setRatingComment(e.target.value)}
+              className="w-full p-2 text-sm rounded border focus:ring-1 focus:ring-brand-500 focus:outline-none resize-none h-20"
+              placeholder="Escribe un comentario (opcional)"
+            />
+
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setShowRateModal(false)}
+                className="flex-1 bg-gray-200 py-2 rounded-full font-semibold hover:bg-gray-300"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={handleRateSubmit}
+                disabled={submittingRating}
+                className="flex-1 bg-brand-500 text-white py-2 rounded-full font-semibold hover:bg-brand-500/90"
+              >
+                {submittingRating ? 'Enviando...' : 'Enviar calificación'}
               </button>
             </div>
           </div>
@@ -528,9 +622,20 @@ export default function Orders(){
                   const name = prod.nombre || prod.name || it.nombre || it.name || 'Producto'
                   const qty = it.cantidad || it.qty || it.quantity || 1
                   const price = it.precio || it.price || prod.precio || prod.price || 0
+                  const canRate = selectedOrder.pago === 'pagado'
                   return (
                     <div key={idx} className="flex items-center justify-between">
-                      <div className="text-sm">{name} <span className="text-ink-500">· {qty}</span></div>
+                      <div className="text-sm">
+                        <div>{name} <span className="text-ink-500">· {qty}</span></div>
+                        {canRate && (
+                          <button 
+                            onClick={() => openRateModal(prod)}
+                            className="text-xs text-brand-600 hover:underline mt-1"
+                          >
+                            Calificar producto
+                          </button>
+                        )}
+                      </div>
                       <div className="text-sm">${Number(price * qty).toLocaleString('es-CO')}</div>
                     </div>
                   )
@@ -557,6 +662,47 @@ export default function Orders(){
           </div>
         </div>
       ) : null}
+
+      {/* Modal de Calificación */}
+      {showRateModal && ratingProduct && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-[92%] max-w-md shadow-xl">
+            <h3 className="text-xl font-bold mb-2">Calificar Producto</h3>
+            <p className="text-ink-700 mb-4">
+              ¿Qué te pareció <strong>{ratingProduct.nombre || ratingProduct.name}</strong>?
+            </p>
+
+            <div className="flex justify-center mb-4">
+              <StarRating value={ratingValue} onChange={setRatingValue} />
+            </div>
+
+            <textarea
+              className="w-full border rounded-lg p-3 text-sm mb-4 focus:ring-2 focus:ring-brand-500 outline-none"
+              rows="3"
+              placeholder="Escribe un comentario (opcional)..."
+              value={ratingComment}
+              onChange={(e) => setRatingComment(e.target.value)}
+            />
+
+            <div className="flex gap-3">
+              <button
+                className="flex-1 bg-gray-200 py-2 rounded-full font-semibold hover:bg-gray-300"
+                onClick={() => setShowRateModal(false)}
+                disabled={submittingRating}
+              >
+                Cancelar
+              </button>
+              <button
+                className="flex-1 bg-brand-500 text-white py-2 rounded-full font-semibold hover:bg-brand-600"
+                onClick={handleRateSubmit}
+                disabled={submittingRating}
+              >
+                {submittingRating ? 'Enviando...' : 'Enviar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
   
