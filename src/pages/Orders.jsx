@@ -29,9 +29,10 @@ const StarRating = ({ value, onChange, readOnly = false }) => {
 export default function Orders(){
   const navigate = useNavigate()
   const toast = useToast()
-  const { cart, removeItem, updateQuantity, clearCart, getTotal } = useCart()
   const { mesa } = useTable()
   const { user } = useAuth()
+  const { cart, removeItem, updateQuantity, clearCart, getTotal, addItem } = useCart()
+
 
   const [orders, setOrders] = useState([])
   const [loadingOrders, setLoadingOrders] = useState(false)
@@ -41,6 +42,11 @@ export default function Orders(){
   const [selectedOrder, setSelectedOrder] = useState(null)
     // control modal de confirmación
   const [showConfirmModal, setShowConfirmModal] = useState(false)
+    // modal repetir pedido
+  const [showRepeatOrderModal, setShowRepeatOrderModal] = useState(false)
+  const [pedidoARepetir, setPedidoARepetir] = useState(null)
+    //Modal detalles de pedidos historial
+  const [showHistoryDetailsModal, setShowHistoryDetailsModal] = useState(false)
 
   // Estado para calificación
   const [showRateModal, setShowRateModal] = useState(false)
@@ -242,6 +248,53 @@ export default function Orders(){
     }
   }
 
+    // ========== FUNCIÓN PARA REPETIR PEDIDO ==========
+  const handleRepetirPedido = (pedido) => {
+    const items = pedido.items || []
+    
+    if (items.length === 0) {
+      toast.show('Este pedido no tiene items', { type: 'error' })
+      return
+    }
+
+    // Abrir modal de confirmación
+    setPedidoARepetir(pedido)
+    setShowRepeatOrderModal(true)
+  }
+
+  const handleConfirmRepeatOrder = () => {
+    if (!pedidoARepetir) return
+    
+    const items = pedidoARepetir.items || []
+    let agregados = 0
+    
+    items.forEach(item => {
+      const producto = item.product || item
+      const cantidad = item.cantidad || item.quantity || item.qty || 1
+      const productoId = producto.id || producto.id_producto || producto.idProduct
+      
+      if (productoId) {
+        addItem(producto, cantidad)
+        agregados++
+      }
+    })
+
+    // Cerrar modal
+    setShowRepeatOrderModal(false)
+    setPedidoARepetir(null)
+
+    if (agregados > 0) {
+      toast.show(
+        `✅ ${agregados} producto${agregados !== 1 ? 's' : ''} agregado${agregados !== 1 ? 's' : ''} al carrito`, 
+        { type: 'success' }
+      )
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      toast.show('No se pudieron agregar los productos', { type: 'error' })
+    }
+  }
+
+    
   async function loadOrders(){
   setLoadingOrders(true)
   try{
@@ -452,51 +505,227 @@ export default function Orders(){
         </div>
       )}
 
+        {/* ========== MODAL DE REPETIR PEDIDO ========== */}
+  {showRepeatOrderModal && pedidoARepetir && (
+    <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+      <div
+        className="bg-white rounded-2xl p-6 w-[92%] max-w-md shadow-xl"
+        role="dialog"
+        aria-modal="true"
+      >
+        <h2 className="text-xl font-bold mb-4 text-center">Repetir pedido</h2>
 
+        {/* Resumen del pedido */}
+        <div className="mb-4 p-4 bg-gray-50 rounded-xl">
+          <div className="text-sm text-ink-700 mb-3 font-semibold text-center">
+            Pedido #{pedidoARepetir.id || pedidoARepetir._id || pedidoARepetir.id_pedido}
+          </div>
+          
+          {/* Lista de items */}
+          <div className="space-y-2 mb-3">
+            {(pedidoARepetir.items || []).slice(0, 3).map((item, idx) => {
+              const prod = item.product || item
+              const name = prod.nombre || prod.name || item.nombre || item.name || 'Producto'
+              const qty = item.cantidad || item.quantity || item.qty || 1
+              return (
+                <div key={idx} className="flex justify-between text-sm">
+                  <span className="text-ink-700">{name}</span>
+                  <span className="text-ink-500 font-semibold">x{qty}</span>
+                </div>
+              )
+            })}
+            {(pedidoARepetir.items || []).length > 3 && (
+              <div className="text-xs text-ink-500 italic text-center pt-1">
+                +{(pedidoARepetir.items || []).length - 3} producto{(pedidoARepetir.items || []).length - 3 !== 1 ? 's' : ''} más
+              </div>
+            )}
+          </div>
 
-      
-
-      <h3 className="text-xl font-semibold mt-4">Pedidos</h3>
-      {/* LISTADO DE PEDIDOS DEL DÍA */}
-<section className="bg-white rounded-2xl p-4 shadow-card mt-4">
-  <h4 className="font-semibold mb-3">Pedidos de hoy</h4>
-
-  {pedidosDelDia.length === 0 && (
-    <p className="text-sm text-ink-500">No tienes pedidos hoy.</p>
-  )}
-
-  {pedidosDelDia.map(order => (  // ← Ahora usa "pedidosDelDia"
-    <div
-      key={order.id_pedido || order.id || order._id}
-      className="mb-3 pb-3 border-b last:border-none cursor-pointer"
-      onClick={() => { setSelectedOrder(order); setShowDetails(true); }}
-    >
-      <div className="flex justify-between">
-        <div>
-          <div className="font-semibold">Pedido #{order.id_pedido || order.id}</div>
-          <div className="text-sm text-ink-500">
-            {formatDate(order.fecha_pedido || order.createdAt || order.created_at || order.fecha)}
+          {/* Total */}
+          <div className="flex justify-between items-center pt-3 border-t border-gray-200">
+            <span className="font-semibold text-ink-900">Total:</span>
+            <span className="font-bold text-lg text-brand-500">
+              ${Number(pedidoARepetir.total || 0).toLocaleString('es-CO')}
+            </span>
           </div>
         </div>
 
-        <div className="text-right">
-          <div className="font-semibold">
-            ${Number(order.total).toLocaleString("es-CO")}
-          </div>
-          <span className={`text-sm px-2 py-1 rounded-full 
-            ${(order.estado || order.status) === "preparando" || (order.estado || order.status) === "preparing" ? "bg-yellow-200 text-yellow-900" : ""}
-            ${(order.estado || order.status) === "entregado" || (order.estado || order.status) === "delivered" ? "bg-green-200 text-green-900" : ""}
-            ${(order.estado || order.status) === "pendiente" || (order.estado || order.status) === "created" ? "bg-gray-200 text-gray-800" : ""}
-          `}>
-            {order.estado || order.status}
-          </span>
+        <p className="text-ink-700 mb-6 text-center">
+          ¿Quieres agregar estos productos a tu carrito actual?
+        </p>
+
+        {/* Botones */}
+        <div className="flex gap-3">
+          <button
+            className="flex-1 bg-gray-200 py-2 rounded-full font-semibold hover:bg-gray-300"
+            onClick={() => {
+              setShowRepeatOrderModal(false)
+              setPedidoARepetir(null)
+            }}
+          >
+            Cancelar
+          </button>
+
+          <button
+            className="flex-1 bg-brand-500 text-white py-2 rounded-full font-semibold hover:bg-brand-500/90"
+            onClick={handleConfirmRepeatOrder}
+          >
+            Agregar al carrito
+          </button>
         </div>
       </div>
     </div>
-  ))}
-</section>
+  )}
 
-      <p className="text-xs text-ink-500 -mt-1">Solicitudes en curso</p>
+      {/* ========== MODAL DE DETALLES PARA HISTORIAL Y PEDIDOS RECIENTES ========== */}
+  {showHistoryDetailsModal && selectedOrder && (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+      <div className="bg-white rounded-2xl w-[92%] md:w-2/3 max-w-lg max-h-[90vh] overflow-auto p-6 shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xl font-bold text-ink-900">
+            Pedido #{selectedOrder.id_pedido || selectedOrder.id || selectedOrder._id || ''}
+          </h3>
+          <button 
+            onClick={() => { 
+              setShowHistoryDetailsModal(false); 
+              setSelectedOrder(null) 
+            }} 
+            className="text-2xl text-ink-500 hover:text-ink-900 leading-none"
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Información del pedido */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-xl space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-ink-600">Fecha:</span>
+            <span className="font-semibold text-ink-900">
+              {formatDate(selectedOrder.fecha || selectedOrder.createdAt || selectedOrder.created_at || selectedOrder.fecha_pedido)}
+            </span>
+          </div>
+          
+          {selectedOrder.id_mesa && (
+            <div className="flex justify-between text-sm">
+              <span className="text-ink-600">Mesa:</span>
+              <span className="font-semibold text-ink-900">{selectedOrder.id_mesa || selectedOrder.mesa}</span>
+            </div>
+          )}
+
+          {/* Estado del pedido */}
+          {(() => {
+            const estado = String(selectedOrder.estado || selectedOrder.status || selectedOrder.estado_pedido || selectedOrder.state || '').toLowerCase()
+            const statusLabel = estado ? (estado.charAt(0).toUpperCase() + estado.slice(1)) : ''
+            const isDelivered = ['entregado','entregada','delivered','served','servido','completado','completed','finalizado','finalizada'].includes(estado)
+            const isCanceled = ['cancelado','cancelada','cancelled','canceled'].includes(estado)
+            const statusClass = isDelivered 
+              ? 'bg-emerald-100 text-emerald-800' 
+              : (isCanceled 
+                ? 'bg-rose-100 text-rose-800' 
+                : 'bg-amber-100 text-amber-800')
+            
+            return statusLabel ? (
+              <div className="flex justify-between text-sm items-center">
+                <span className="text-ink-600">Estado:</span>
+                <span className={`text-xs px-3 py-1 rounded-full font-semibold ${statusClass}`}>
+                  {statusLabel}
+                </span>
+              </div>
+            ) : null
+          })()}
+
+          {/* Estado de pago */}
+          {(() => {
+            const pagoValue = selectedOrder.pagado || selectedOrder.paid || selectedOrder.is_paid || selectedOrder.pago || ''
+            const pagoStr = String(pagoValue).toLowerCase()
+            const pagado = pagoValue === true || pagoStr === 'pagado' || pagoStr === 'paid' || pagoStr === 'si' || pagoStr === 'yes' || pagoStr === 'true'
+            const paymentLabel = pagado ? 'Pagado' : 'No pagado'
+            const paymentClass = pagado ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+            
+            return (
+              <div className="flex justify-between text-sm items-center">
+                <span className="text-ink-600">Pago:</span>
+                <span className={`text-xs px-3 py-1 rounded-full font-semibold ${paymentClass}`}>
+                  {paymentLabel}
+                </span>
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* Lista de items con imágenes */}
+        <div className="mb-6">
+          <h4 className="font-semibold text-ink-900 mb-3">Productos</h4>
+          <div className="space-y-3">
+            {(selectedOrder.items || selectedOrder.detalle || []).map((it, idx) => {
+              const prod = it.product || it
+              const name = prod.nombre || prod.name || it.nombre || it.name || 'Producto'
+              const qty = it.cantidad || it.qty || it.quantity || 1
+              const price = it.precio || it.price || prod.precio || prod.price || 0
+              const img = prod.imagen_url || prod.image || prod.img || '/icons/burger.png'
+              
+              return (
+                <div key={idx} className="flex items-center gap-3">
+                  {/* Imagen del producto */}
+                  <img
+                    src={img}
+                    alt={name}
+                    loading="lazy"
+                    onError={e => { 
+                      e.currentTarget.onerror = null; 
+                      e.currentTarget.src = '/icons/burger.png' 
+                    }}
+                    className="w-16 h-16 rounded-lg object-cover border bg-gray-100 flex-shrink-0"
+                  />
+                  
+                  {/* Información del producto */}
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-ink-900 truncate">{name}</div>
+                    <div className="text-sm text-ink-600">Cantidad: {qty}</div>
+                  </div>
+                  
+                  {/* Precio */}
+                  <div className="text-right flex-shrink-0">
+                    <div className="font-bold text-ink-900">
+                      ${Number(price * qty).toLocaleString('es-CO')}
+                    </div>
+                    <div className="text-xs text-ink-500">
+                      ${Number(price).toLocaleString('es-CO')} c/u
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Total */}
+        <div className="mb-6 p-4 bg-gray-50 rounded-xl">
+          <div className="flex justify-between items-center">
+            <span className="text-lg font-semibold text-ink-900">Total:</span>
+            <span className="text-2xl font-bold text-brand-500">
+              ${Number(selectedOrder.total || selectedOrder.total_price || selectedOrder.precio_total || 0).toLocaleString('es-CO')}
+            </span>
+          </div>
+        </div>
+
+        {/* Botón de acción */}
+        <button
+          className="w-full rounded-full bg-brand-500 text-white px-5 py-3 font-semibold hover:bg-brand-600 transition-colors"
+          onClick={() => {
+            setShowHistoryDetailsModal(false)
+            handleRepetirPedido(selectedOrder)
+          }}
+        >
+          Pedir de nuevo
+        </button>
+      </div>
+    </div>
+  )}
+
+
+  <p className="text-xs text-ink-500 -mt-1">Solicitudes en curso</p>
 
       <section className="bg-white rounded-2xl p-4 shadow-card">
         {(!cart || !cart.items || cart.items.length===0) ? (
@@ -552,9 +781,83 @@ export default function Orders(){
           </div>
         )}
       </section>
+      
+
+      <h3 className="text-xl font-semibold mt-4">Pedidos recientes</h3>
+      {/* LISTADO DE PEDIDOS DEL DÍA */}
+  <section className="bg-white rounded-2xl p-4 shadow-card mt-4">
+  
+  {pedidosDelDia.length === 0 && (
+    <p className="text-sm text-ink-500">No tienes pedidos hoy.</p>
+  )}
+
+  
+        {loadingOrders ? (
+          <div className="text-ink-500">Cargando pedidos del día...</div>
+        ) : pedidosDelDia && pedidosDelDia.length === 0 ? (
+          <div className="text-sm text-ink-500">Aún no has hecho pedidos hoy. Cuando confirmes un pedido aparecerá aquí.</div>
+        ) : (
+          pedidosDelDia.map(o=>{
+            const items = o.items || []
+            const count = items.length || o.total_items || 0
+            const title = items[0] ? (items[0].product?.nombre || items[0].product?.name || items[0].nombre || items[0].name) : 'Pedido'
+            const total = o.total || o.total_price || o.precio_total || 0
+            const date = o.createdAt || o.fecha || o.created_at || ''
+            const formattedDate = date ? formatDate(date) : ''
+            // historial: don't show thumbnails here, only key info
+            const estado = String(o.estado || o.status || o.estado_pedido || o.state || '').toLowerCase()
+            const statusLabel = estado ? (estado.charAt(0).toUpperCase() + estado.slice(1)) : ''
+            const isDelivered = ['entregado','entregada','delivered','served','servido','completado','completed','finalizado','finalizada'].includes(estado)
+            const isCanceled = ['cancelado','cancelada','cancelled','canceled'].includes(estado)
+            const statusClass = isDelivered ? 'bg-emerald-100 text-emerald-800' : (isCanceled ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-ink-700')
+
+            //Estado de pago
+            
+            const pagoValue = o.pagado || o.paid || o.is_paid || o.pago || ''
+            const pagoStr = String(pagoValue).toLowerCase()
+            const pagado = pagoValue === true || pagoStr === 'pagado' || pagoStr === 'paid' || pagoStr === 'si' || pagoStr === 'yes' || pagoStr === 'true'
+            const paymentLabel = pagado ? 'Pagado' : 'No pagado'
+            // Necesitas esta línea para los colores del badge de pago
+            const paymentClass = pagado ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+            
+            
+            return (
+              <div key={o.id || o._id || o.numero || o.id_pedido} className="flex items-center gap-3 mb-3">
+                <div className="flex-1">
+                  <div className="font-semibold">{title} · {count} Productos <span className="text-ink-500">›</span></div>
+                  <div className="text-sm text-ink-700">{items.slice(0,2).map(it=>(it.product?.nombre || it.nombre || it.name)).join(' + ')}</div>
+                  <div className="text-xs text-ink-500">${Number(total).toLocaleString('es-CO')} {formattedDate ? '· ' + formattedDate : ''}</div>
+                  {statusLabel ? (
+                    <div className={`mt-2 inline-block text-xs px-2 py-1 rounded-full ${statusClass}`}>{statusLabel}</div>
+                  ) : null}
+                  <div className={`inline-block text-xs px-2 py-1 rounded-full ${paymentClass}`}>
+                        {paymentLabel}
+                      </div>
+                </div>
+                      <div className="flex flex-col gap-2">
+                        <button onClick={()=>{ // Ir al checkout preview para pagar el pedido
+                          navigate("/checkout")
+                          console.log("Pagar pedido", selectedOrder); }} className="text-xs bg-brand-500 text-white px-3 py-1 rounded-full hover:bg-brand-500/90 transition-colors">Pagar</button>
+                        <button 
+                          onClick={() => { 
+                            setSelectedOrder(o); 
+                            setShowHistoryDetailsModal(true) 
+                          }} 
+                          className="text-xs border border-gray-200 text-ink-700 px-3 py-1 rounded-full hover:bg-gray-50 transition-colors"
+                        >
+                          Detalles
+                        </button>           
+                      </div>
+              </div>
+            )
+          })
+  )}
+      </section>
+
+      
 
       <h3 className="text-xl font-semibold mt-2">Historial</h3>
-      <p className="text-xs text-ink-500 -mt-1">Sabores exquisitos en porciones justas</p>
+      <p className="text-xs text-ink-500 -mt-1">Estas son las órdenes que has realizado anteriormente</p>
 
       <section className="bg-white rounded-2xl p-4 shadow-card">
         {loadingOrders ? (
@@ -563,7 +866,7 @@ export default function Orders(){
           <div className="text-ink-500">Aún no has hecho pedidos. Cuando confirmes un pedido aparecerá aquí.</div>
         ) : (
           historial.map(o=>{
-            const items = o.items || o.detalle || []
+            const items = o.items || []
             const count = items.length || o.total_items || 0
             const title = items[0] ? (items[0].product?.nombre || items[0].product?.name || items[0].nombre || items[0].name) : 'Pedido'
             const total = o.total || o.total_price || o.precio_total || 0
@@ -586,8 +889,21 @@ export default function Orders(){
                   ) : null}
                 </div>
                       <div className="flex flex-col gap-2">
-                        <button onClick={()=>{ /* repetir pedido */ }} className="text-xs bg-brand-100 text-ink-900 px-3 py-1 rounded-full">Pedir de nuevo</button>
-                        <button onClick={()=>{ setSelectedOrder(o); setShowDetails(true) }} className="text-xs border border-gray-200 text-ink-700 px-3 py-1 rounded-full">Detalles</button>
+                      <button 
+                        onClick={() => handleRepetirPedido(o)} 
+                        className="text-xs bg-brand-500 text-white px-3 py-1 rounded-full hover:bg-brand-500/90 transition-colors"
+                      >
+                         Pedir de nuevo
+                      </button>      
+                      <button 
+                        onClick={() => { 
+                          setSelectedOrder(o); 
+                          setShowHistoryDetailsModal(true) 
+                        }} 
+                        className="text-xs border border-gray-200 text-ink-700 px-3 py-1 rounded-full hover:bg-gray-50 transition-colors"
+                      >
+                        Detalles
+                      </button>                      
                       </div>
               </div>
             )
