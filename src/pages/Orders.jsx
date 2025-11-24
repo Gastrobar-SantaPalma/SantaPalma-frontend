@@ -468,42 +468,7 @@ export default function Orders(){
         </div>
       )}
 
-      {/* Modal de calificación */}
-      {showRateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-[92%] max-w-md text-center shadow-xl">
-            <h2 className="text-xl font-bold mb-4">Calificar producto</h2>
-
-            <div className="mb-4">
-              <StarRating value={ratingValue} onChange={setRatingValue} />
-            </div>
-
-            <textarea
-              value={ratingComment}
-              onChange={(e) => setRatingComment(e.target.value)}
-              className="w-full p-2 text-sm rounded border focus:ring-1 focus:ring-brand-500 focus:outline-none resize-none h-20"
-              placeholder="Escribe un comentario (opcional)"
-            />
-
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={() => setShowRateModal(false)}
-                className="flex-1 bg-gray-200 py-2 rounded-full font-semibold hover:bg-gray-300"
-              >
-                Cancelar
-              </button>
-
-              <button
-                onClick={handleRateSubmit}
-                disabled={submittingRating}
-                className="flex-1 bg-brand-500 text-white py-2 rounded-full font-semibold hover:bg-brand-500/90"
-              >
-                {submittingRating ? 'Enviando...' : 'Enviar calificación'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      
 
         {/* ========== MODAL DE REPETIR PEDIDO ========== */}
   {showRepeatOrderModal && pedidoARepetir && (
