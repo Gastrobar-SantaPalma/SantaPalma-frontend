@@ -58,7 +58,7 @@ export default function Login() {
         correo: formLogin.get('email'),
         contrasena: formLogin.get('password')
       }
-      console.log("ENVIANDO PAYLOAD:", payload);
+      if (import.meta.env.MODE === 'development') console.debug("ENVIANDO PAYLOAD:", payload);
   const res = await api.post('/api/auth/login', payload, { credentials: 'omit', noAuth: true })
   // prefer passing the whole response to login() so context can store user if provided
   login(res)
