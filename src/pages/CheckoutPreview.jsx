@@ -234,8 +234,10 @@ export default function CheckoutPreview() {
                                         {/* Botón de pago */}
                                         <button
                                         onClick={() => {
-                                            console.log('Procesando pago de pedidos:', selectedPedidos)
-                                            console.log('Total:', totalSeleccionado)
+                                            if (import.meta.env.MODE === 'development') {
+                                                console.debug('Procesando pago de pedidos:', selectedPedidos)
+                                                console.debug('Total:', totalSeleccionado)
+                                            }
                                         }}
                                         className="bg-brand-500 text-white px-8 py-3 rounded-full font-semibold hover:bg-brand-600 transition-colors shadow-md hover:shadow-lg"
                                         >
