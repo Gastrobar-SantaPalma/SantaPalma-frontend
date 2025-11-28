@@ -3,7 +3,7 @@ import { api } from '../api/client.js'
 import { useAuth } from '../context/AuthContext'
 import { useNavigate } from 'react-router-dom'
 
-export default function PreviewCheckout() {
+export default function CheckoutPreview() {
 
     const navigate = useNavigate()
     const { user } = useAuth()
