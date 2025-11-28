@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom'
 
 export default function CheckoutPreview() {
 
-    const navigate = useNavigate()
     const { user } = useAuth()
     const [pedidosPendientes, setPedidosPendientes] = useState([])
     const [loadingPedidos, setLoadingPedidos] = useState(false)
