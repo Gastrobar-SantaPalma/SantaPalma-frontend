@@ -58,7 +58,7 @@ export default function CheckoutPreview() {
 
     useEffect(() => {
         loadPedidosPendientes()
-        }, [])
+        }, [user])
 
     function formatDate(dateStr) {
         if (!dateStr) return ''
