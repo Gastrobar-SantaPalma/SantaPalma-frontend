@@ -3,9 +3,8 @@
 // 1) `import.meta.env.VITE_BACKEND_URL` when explicitly provided (useful for direct backend during dev or production builds)
 // 2) In development, use empty string so requests use relative `/api` and Vite's dev server proxy forwards them to the backend
 // 3) Otherwise default to empty string (relative paths)
+
 const BASE = import.meta.env.VITE_BACKEND_URL || (import.meta.env.MODE === 'development' ? '' : '')
-
-
 let token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
 
 // ESTA DEFINICIÓN ESTABA FALTANDO (o se perdió en el conflicto)
@@ -145,14 +144,5 @@ export default {
   clearToken,
 }
 
-//Devolver pedidos confirmados en listado de pedidos
-export async function fetchUserOrders(userId) {
-  const { data, error } = await supabase
-    .from("orders")
-    .select("id, status, payment_state, products, total, created_at")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
 
-  if (error) throw error;
-  return data;
-}
+

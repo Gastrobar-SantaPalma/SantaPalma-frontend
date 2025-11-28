@@ -30,14 +30,13 @@ export default function Signup(){
     setError(null)
     setLoading(true)
     try{
-      // Only send fields supported by the backend (nombre, correo, contrasena, rol)
+      // Only send fields supported by the backend (nombre, correo, contrasena)
       const payload = {
         nombre: data.nombre,
         correo: data.correo,
-        contrasena: data.contrasena,
-        rol: 'cliente'
+        contrasena: data.contrasena
       }
-      const res = await api.post('/api/usuarios', payload, { credentials: 'omit', noAuth: true })
+      const res = await api.post('/api/auth/signup', payload, { credentials: 'omit', noAuth: true })
       if (import.meta.env.MODE === 'development') {
         console.debug('[signup][dev] created user response ->', res)
       }
@@ -49,7 +48,7 @@ export default function Signup(){
       }else{
         try{
           if (import.meta.env.MODE === 'development') console.debug('[signup][dev] attempting auto-login for', data.correo)
-          const auth = await api.post('/api/usuarios/login', { correo: data.correo, contrasena: data.contrasena }, { credentials: 'omit', noAuth: true })
+          const auth = await api.post('/api/auth/login', { correo: data.correo, contrasena: data.contrasena }, { credentials: 'omit', noAuth: true })
           if (import.meta.env.MODE === 'development') console.debug('[signup][dev] auto-login response ->', auth)
           // login will handle token/user shapes
           login(auth)
