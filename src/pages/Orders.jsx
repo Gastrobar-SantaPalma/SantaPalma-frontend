@@ -82,7 +82,10 @@ export default function Orders(){
   const [now, setNow] = useState(Date.now())
 
   // derive clientId for filtering orders and determine history (finalized) orders
-  const clientId = user && (user.id_usuario || user.id || user._id || user.id_cliente) ? (user.id_usuario || user.id || user._id || user.id_cliente) : null
+// ID único del cliente válido para todo el componente
+  const clientId = user
+    ? Number(user.id_usuario ?? user.id ?? user.id_cliente ?? user._id)
+    : null;
   const finalizedStatuses = new Set([
     'entregado','entregada','delivered','served','servido','completado','completed','finalizado','finalizada',
     'cancelado','cancelada','cancelled','canceled'
@@ -157,62 +160,63 @@ export default function Orders(){
   }
 
 
-  async function handleConfirm(){
-  if(!cart.items || cart.items.length===0) return toast.show('El carrito está vacío', { type: 'error' })
-    setSubmitting(true)
-    try{
-      // Build payload according to backend expected shape
-      const items = cart.items.map(i=>({ id_producto: i.product.id || i.product.id_producto || i.product.idProduct, cantidad: i.cantidad }))
-      const clienteId = user && (user.id_usuario || user.id || user._id || user.id_cliente) ? String(user.id_usuario || user.id || user._id || user.id_cliente) : undefined
-      const payload = {
-        ...(mesa && mesa.mesaId ? { id_mesa: mesa.mesaId } : {}),
-        ...(clienteId ? { id_cliente: clienteId } : {}),
-        items
-      }
-      const res = await api.post('/api/pedidos', payload)
-      console.log(payload);
-      
-
-      // success: clear cart and update orders immediately so the tracker updates
-      clearCart()
-      toast.show('Pedido creado con éxito', { type: 'success' })
-      // if backend returned the created pedido object, prepend it to orders
-      try{
-        let created = res && (res.id_pedido || res.id || res._id) ? res : (res && res.pedido ? res.pedido : null)
-        if(created){
-          // ensure a timestamp exists so the timer can run immediately
-          if(!created.createdAt && !created.fecha && !created.created_at){
-            created = { ...created, createdAt: (new Date()).toISOString() }
-          }
-          setOrders(prev => Array.isArray(prev) ? [created, ...prev] : [created])
-          // also open details modal for the newly created order (optional UX)
-          setSelectedOrder(created)
-          setShowDetails(true)
-        } else {
-          // fallback: reload list
-          const r = await api.get('/api/pedidos')
-          let arr = []
-          if(r){
-            if(Array.isArray(r)) arr = r
-            else if(r.pedidos && Array.isArray(r.pedidos)) arr = r.pedidos
-            else if(r.orders && Array.isArray(r.orders)) arr = r.orders
-            else if(r.data && Array.isArray(r.data)) arr = r.data
-          }
-          setOrders(Array.isArray(arr) ? arr : [])
-        }
-      }catch(_){ /* ignore reload error */ }
-      navigate('/orders')
-    }catch(e){
-      console.error('error creating order', e)
-  const msg = e && e.message ? e.message : 'Error creando pedido'
-  toast.show(msg, { type: 'error' })
-    }finally{
-      setSubmitting(false)
+  async function handleConfirm() {
+    if (!cart.items || cart.items.length === 0) {
+      return toast.show("El carrito está vacío", { type: "error" });
     }
-    await loadOrders();
-    
 
+    setSubmitting(true);
+
+    try {
+      // ID cliente SIEMPRE número entero
+      const clientId = Number(
+        user?.id_cliente ??
+        user?.id_usuario ??
+        user?.id ??
+        user?._id
+      );
+
+      if (!clientId || isNaN(clientId)) {
+        throw new Error("No se encontró un id_cliente numérico válido");
+      }
+
+      // Items correctos
+      const items = cart.items.map(i => ({
+        id_producto:
+          i.product?.id_producto ??
+          i.product?.id ??
+          i.id_producto ??
+          i.id ??
+          null,
+        cantidad: Number(i.cantidad || 1),
+      }));
+
+      const payload = {
+        id_cliente: String(clientId), // 👈 Supabase valida Int4 pero schema pide string
+        
+        ...(mesa?.mesaId ? { id_mesa: Number(mesa.mesaId) } : {}),
+        items,
+      };
+
+      console.log("PAYLOAD FINAL:", payload);
+
+      const res = await api.post("/api/pedidos", payload);
+
+      clearCart();
+      toast.show("Pedido creado con éxito", { type: "success" });
+
+      await loadOrders();
+      navigate("/orders");
+    } catch (e) {
+      console.error("error creating order", e);
+      const msg = e?.data?.error || e?.message || "Error creando pedido";
+      toast.show(msg, { type: "error" });
+    } finally {
+      setSubmitting(false);
+    }
   }
+
+
 
   const openRateModal = (product) => {
     setRatingProduct(product)
