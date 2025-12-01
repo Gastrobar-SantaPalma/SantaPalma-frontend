@@ -212,6 +212,8 @@ export default function Orders(){
       };
 
       console.log("PAYLOAD FINAL:", payload);
+      
+
 
       const res = await api.post("/api/pedidos", payload);
 
