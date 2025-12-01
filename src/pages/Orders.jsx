@@ -91,21 +91,23 @@ export default function Orders(){
     'cancelado','cancelada','cancelled','canceled'
   ])
 
-  const historial = Array.isArray(orders) ? orders.filter(o=>{
-    
-    
-    // try to match by client id first
+  const historial = Array.isArray(orders) ? orders.filter(o => {
+    // Filtrar por cliente
     if(clientId){
       const oid = o.id_cliente || o.cliente?.id_usuario || o.cliente?.id || o.user_id || o.id_usuario || o.cliente_id || o.customer_id || o.customer?.id
-      if(oid != null) return String(oid) === String(clientId)
-      // if oid not present, try matching by email
+      if(oid != null && String(oid) !== String(clientId)) return false
+      
       const orderEmail = (o.correo || o.email || o.cliente?.correo || o.cliente?.email || '').toLowerCase()
-      if(orderEmail && user && user.correo) return orderEmail === String(user.correo).toLowerCase()
-      // if neither id nor email present, include the finalized order conservatively
-      return true
+      if(!oid && orderEmail && user && user.correo && orderEmail !== String(user.correo).toLowerCase()) return false
     }
-    // no client in session: show finalized orders (admin or public view)
-    return true
+    
+    // Verificar si está pagado
+    const pagoValue = o.pago || o.pagado || o.paid || o.is_paid || ''
+    const pagoStr = String(pagoValue).toLowerCase()
+    const pagado = pagoValue === true || pagoStr === 'pagado' || pagoStr === 'paid' || pagoStr === 'si' || pagoStr === 'yes' || pagoStr === 'true'
+    
+    // 👇 SOLO mostrar pedidos pagados
+    return pagado
   }) : []
 
   // Filtrar los pedidos para obtener solo los del día actual
@@ -113,14 +115,25 @@ export default function Orders(){
   hoyInicio.setHours(0, 0, 0, 0)
 
   const pedidosDelDia = Array.isArray(orders) ? orders.filter(o => {
+    // Filtrar por cliente
     if(clientId){
       const oid = o.id_cliente || o.cliente?.id_usuario || o.cliente?.id || o.user_id || o.id_usuario || o.cliente_id
       if(oid != null && String(oid) !== String(clientId)) return false
     }
+    
+    // Filtrar por fecha (solo del día actual)
     const fechaPedido = o.fecha_pedido || o.fecha || o.createdAt || o.created_at
     if (!fechaPedido) return false
     const pedidoDate = new Date(fechaPedido)
-    return pedidoDate >= hoyInicio
+    if (pedidoDate < hoyInicio) return false
+    
+    // 👇 AGREGAR: Excluir pedidos pagados
+    const pagoValue = o.pago || o.pagado || o.paid || o.is_paid || ''
+    const pagoStr = String(pagoValue).toLowerCase()
+    const pagado = pagoValue === true || pagoStr === 'pagado' || pagoStr === 'paid' || pagoStr === 'si' || pagoStr === 'yes' || pagoStr === 'true'
+    
+    // Solo mostrar pedidos NO pagados
+    return !pagado
   }) : []
 
   // orders to show to the current user / mesa (includes active and finalized)
@@ -366,6 +379,22 @@ export default function Orders(){
     return ()=>{ mounted = false }
   }, [])
 
+  // Agregar después del useEffect existente que carga los pedidos
+  useEffect(() => {
+    // Recargar pedidos cuando la página se vuelve visible
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        loadOrders()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [])
+
   // determine a representative order state to show in the tracker (most recent active order)
   const recentOrder = visibleOrders && visibleOrders.length > 0 ? visibleOrders[0] : (orders && orders.length > 0 ? orders[0] : null)
   const recentEstado = recentOrder ? (recentOrder.estado || recentOrder.status || recentOrder.estado_pedido || recentOrder.state) : undefined
@@ -606,7 +635,8 @@ export default function Orders(){
 
           {/* Estado de pago */}
           {(() => {
-            const pagoValue = selectedOrder.pagado || selectedOrder.paid || selectedOrder.is_paid || selectedOrder.pago || ''
+            // ✅ CORRECTO (prioritario con el campo que usa el webhook)
+            const pagoValue = o.pago || o.pagado || o.paid || o.is_paid || ''
             const pagoStr = String(pagoValue).toLowerCase()
             const pagado = pagoValue === true || pagoStr === 'pagado' || pagoStr === 'paid' || pagoStr === 'si' || pagoStr === 'yes' || pagoStr === 'true'
             const paymentLabel = pagado ? 'Pagado' : 'No pagado'
@@ -753,132 +783,194 @@ export default function Orders(){
       
 
       <h3 className="text-xl font-semibold mt-4">Pedidos recientes</h3>
-      {/* LISTADO DE PEDIDOS DEL DÍA */}
+        {/* LISTADO DE PEDIDOS DEL DÍA */}
   <section className="bg-white rounded-2xl p-4 shadow-card mt-4">
-  
-  {pedidosDelDia.length === 0 && (
-    <p className="text-sm text-ink-500">No tienes pedidos hoy.</p>
-  )}
+    {loadingOrders ? (
+      <div className="text-ink-500">Cargando pedidos del día...</div>
+    ) : pedidosDelDia.length === 0 ? (
+      <div className="text-sm text-ink-500">Aún no has hecho pedidos hoy. Cuando confirmes un pedido aparecerá aquí.</div>
+    ) : (
+      pedidosDelDia.map(o => {
+        const items = o.items || []
+        const count = items.length || o.total_items || 0
+        const title = items[0] ? (items[0].product?.nombre || items[0].product?.name || items[0].nombre || items[0].name) : 'Pedido'
+        const total = o.total || o.total_price || o.precio_total || 0
+        const date = o.createdAt || o.fecha || o.created_at || ''
+        const formattedDate = date ? formatDate(date) : ''
+        
+        // Estado del pedido
+        const estado = String(o.estado || o.status || o.estado_pedido || o.state || '').toLowerCase()
+        const statusLabel = estado ? (estado.charAt(0).toUpperCase() + estado.slice(1)) : ''
+        const isDelivered = ['entregado','entregada','delivered','served','servido','completado','completed','finalizado','finalizada'].includes(estado)
+        const isCanceled = ['cancelado','cancelada','cancelled','canceled'].includes(estado)
+        const statusClass = isDelivered ? 'bg-emerald-100 text-emerald-800' : (isCanceled ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-ink-700')
 
-  
-        {loadingOrders ? (
-          <div className="text-ink-500">Cargando pedidos del día...</div>
-        ) : pedidosDelDia && pedidosDelDia.length === 0 ? (
-          <div className="text-sm text-ink-500">Aún no has hecho pedidos hoy. Cuando confirmes un pedido aparecerá aquí.</div>
-        ) : (
-          pedidosDelDia.map(o=>{
-            const items = o.items || []
-            const count = items.length || o.total_items || 0
-            const title = items[0] ? (items[0].product?.nombre || items[0].product?.name || items[0].nombre || items[0].name) : 'Pedido'
-            const total = o.total || o.total_price || o.precio_total || 0
-            const date = o.createdAt || o.fecha || o.created_at || ''
-            const formattedDate = date ? formatDate(date) : ''
-            // historial: don't show thumbnails here, only key info
-            const estado = String(o.estado || o.status || o.estado_pedido || o.state || '').toLowerCase()
-            const statusLabel = estado ? (estado.charAt(0).toUpperCase() + estado.slice(1)) : ''
-            const isDelivered = ['entregado','entregada','delivered','served','servido','completado','completed','finalizado','finalizada'].includes(estado)
-            const isCanceled = ['cancelado','cancelada','cancelled','canceled'].includes(estado)
-            const statusClass = isDelivered ? 'bg-emerald-100 text-emerald-800' : (isCanceled ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-ink-700')
-
-            //Estado de pago
-            
-            const pagoValue = o.pagado || o.paid || o.is_paid || o.pago || ''
-            const pagoStr = String(pagoValue).toLowerCase()
-            const pagado = pagoValue === true || pagoStr === 'pagado' || pagoStr === 'paid' || pagoStr === 'si' || pagoStr === 'yes' || pagoStr === 'true'
-            const paymentLabel = pagado ? 'Pagado' : 'No pagado'
-            // Necesitas esta línea para los colores del badge de pago
-            const paymentClass = pagado ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
-            
-            
-            return (
-              <div key={o.id || o._id || o.numero || o.id_pedido} className="flex items-center gap-3 mb-3">
-                <div className="flex-1">
-                  <div className="font-semibold">{title} · {count} Productos <span className="text-ink-500">›</span></div>
-                  <div className="text-sm text-ink-700">{items.slice(0,2).map(it=>(it.product?.nombre || it.nombre || it.name)).join(' + ')}</div>
-                  <div className="text-xs text-ink-500">${Number(total).toLocaleString('es-CO')} {formattedDate ? '· ' + formattedDate : ''}</div>
-                  {statusLabel ? (
-                    <div className={`mt-2 inline-block text-xs px-2 py-1 rounded-full ${statusClass}`}>{statusLabel}</div>
-                  ) : null}
-                  <div className={`inline-block text-xs px-2 py-1 rounded-full ${paymentClass}`}>
-                        {paymentLabel}
-                      </div>
-                </div>
-                      <div className="flex flex-col gap-2">
-                        <button onClick={()=>{ // Ir al checkout preview para pagar el pedido
-                          navigate("/checkout")
-                          console.log("Pagar pedido", selectedOrder); }} className="text-xs bg-brand-500 text-white px-3 py-1 rounded-full hover:bg-brand-500/90 transition-colors">Pagar</button>
-                        <button 
-                          onClick={() => { 
-                            setSelectedOrder(o); 
-                            setShowHistoryDetailsModal(true) 
-                          }} 
-                          className="text-xs border border-gray-200 text-ink-700 px-3 py-1 rounded-full hover:bg-gray-50 transition-colors"
-                        >
-                          Detalles
-                        </button>           
-                      </div>
+        // Estado de pago DEL PEDIDO COMPLETO
+        const pagoValue = o.pago || o.pagado || o.paid || o.is_paid || ''
+        const pagoStr = String(pagoValue).toLowerCase()
+        const pagado = pagoValue === true || pagoStr === 'pagado' || pagoStr === 'paid' || pagoStr === 'si' || pagoStr === 'yes' || pagoStr === 'true'
+        const paymentLabel = pagado ? 'Pagado' : 'No pagado'
+        const paymentClass = pagado ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+        
+        return (
+          <div key={o.id_pedido || o.id || o._id} className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100 last:border-0">
+            <div className="flex-1">
+              {/* Título del pedido con cantidad de productos */}
+              <div className="font-semibold">
+                Pedido #{o.id_pedido || o.id} · {count} Producto{count !== 1 ? 's' : ''}
               </div>
-            )
-          })
-  )}
-      </section>
+              
+              {/* Primeros 2-3 items como preview */}
+              <div className="text-sm text-ink-700">
+                {items.slice(0, 2).map(it => {
+                  const prod = it.product || it
+                  const nombre = prod.nombre || prod.name || it.nombre || it.name || 'Producto'
+                  const qty = it.cantidad || it.qty || it.quantity || 1
+                  return `${nombre} (x${qty})`
+                }).join(' • ')}
+                {items.length > 2 && ` • +${items.length - 2} más`}
+              </div>
+              
+              {/* Total y fecha */}
+              <div className="text-xs text-ink-500 mt-1">
+                ${Number(total).toLocaleString('es-CO')} {formattedDate ? '· ' + formattedDate : ''}
+              </div>
+              
+              {/* Badges de estado */}
+              <div className="flex gap-2 mt-2">
+                {statusLabel && (
+                  <div className={`inline-block text-xs px-2 py-1 rounded-full ${statusClass}`}>
+                    {statusLabel}
+                  </div>
+                )}
+                <div className={`inline-block text-xs px-2 py-1 rounded-full ${paymentClass}`}>
+                  {paymentLabel}
+                </div>
+              </div>
+            </div>
+            
+            {/* Botones de acción */}
+            <div className="flex flex-col gap-2">
+              {!pagado && (
+                <button 
+                  onClick={() => {
+                    // Navegar al checkout con el id del pedido
+                    navigate(`/checkout?pedido=${o.id_pedido || o.id}`)
+                  }} 
+                  className="text-xs bg-brand-500 text-white px-3 py-1 rounded-full hover:bg-brand-500/90 transition-colors whitespace-nowrap"
+                >
+                  Pagar
+                </button>
+              )}
+              <button 
+                onClick={() => { 
+                  setSelectedOrder(o); 
+                  setShowHistoryDetailsModal(true) 
+                }} 
+                className="text-xs border border-gray-200 text-ink-700 px-3 py-1 rounded-full hover:bg-gray-50 transition-colors whitespace-nowrap"
+              >
+                Detalles
+              </button>
+            </div>
+          </div>
+        )
+      })
+    )}
+  </section>
 
       
 
-      <h3 className="text-xl font-semibold mt-2">Historial</h3>
-      <p className="text-xs text-ink-500 -mt-1">Estas son las órdenes que has realizado anteriormente</p>
+        <h3 className="text-xl font-semibold mt-2">Historial</h3>
+  <p className="text-xs text-ink-500 -mt-1">Estas son las órdenes que has realizado anteriormente</p>
 
-      <section className="bg-white rounded-2xl p-4 shadow-card">
-        {loadingOrders ? (
-          <div className="text-ink-500">Cargando historial...</div>
-        ) : historial && historial.length === 0 ? (
-          <div className="text-ink-500">Aún no has hecho pedidos. Cuando confirmes un pedido aparecerá aquí.</div>
-        ) : (
-          historial.map(o=>{
-            const items = o.items || []
-            const count = items.length || o.total_items || 0
-            const title = items[0] ? (items[0].product?.nombre || items[0].product?.name || items[0].nombre || items[0].name) : 'Pedido'
-            const total = o.total || o.total_price || o.precio_total || 0
-            const date = o.createdAt || o.fecha || o.created_at || ''
-            const formattedDate = date ? formatDate(date) : ''
-            // historial: don't show thumbnails here, only key info
-            const estado = String(o.estado || o.status || o.estado_pedido || o.state || '').toLowerCase()
-            const statusLabel = estado ? (estado.charAt(0).toUpperCase() + estado.slice(1)) : ''
-            const isDelivered = ['entregado','entregada','delivered','served','servido','completado','completed','finalizado','finalizada'].includes(estado)
-            const isCanceled = ['cancelado','cancelada','cancelled','canceled'].includes(estado)
-            const statusClass = isDelivered ? 'bg-emerald-100 text-emerald-800' : (isCanceled ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-ink-700')
-            return (
-              <div key={o.id || o._id || o.numero || o.id_pedido} className="flex items-center gap-3 mb-3">
-                <div className="flex-1">
-                  <div className="font-semibold">{title} · {count} Productos <span className="text-ink-500">›</span></div>
-                  <div className="text-sm text-ink-700">{items.slice(0,2).map(it=>(it.product?.nombre || it.nombre || it.name)).join(' + ')}</div>
-                  <div className="text-xs text-ink-500">${Number(total).toLocaleString('es-CO')} {formattedDate ? '· ' + formattedDate : ''}</div>
-                  {statusLabel ? (
-                    <div className={`mt-2 inline-block text-xs px-2 py-1 rounded-full ${statusClass}`}>{statusLabel}</div>
-                  ) : null}
-                </div>
-                      <div className="flex flex-col gap-2">
-                      <button 
-                        onClick={() => handleRepetirPedido(o)} 
-                        className="text-xs bg-brand-500 text-white px-3 py-1 rounded-full hover:bg-brand-500/90 transition-colors"
-                      >
-                         Pedir de nuevo
-                      </button>      
-                      <button 
-                        onClick={() => { 
-                          setSelectedOrder(o); 
-                          setShowHistoryDetailsModal(true) 
-                        }} 
-                        className="text-xs border border-gray-200 text-ink-700 px-3 py-1 rounded-full hover:bg-gray-50 transition-colors"
-                      >
-                        Detalles
-                      </button>                      
-                      </div>
+  <section className="bg-white rounded-2xl p-4 shadow-card">
+    {loadingOrders ? (
+      <div className="text-ink-500">Cargando historial...</div>
+    ) : historial && historial.length === 0 ? (
+      <div className="text-ink-500">Aún no tienes pedidos en tu historial.</div>
+    ) : (
+      historial.map(o => {
+        const items = o.items || []
+        const count = items.length || o.total_items || 0
+        const title = items[0] ? (items[0].product?.nombre || items[0].product?.name || items[0].nombre || items[0].name) : 'Pedido'
+        const total = o.total || o.total_price || o.precio_total || 0
+        const date = o.createdAt || o.fecha || o.created_at || o.fecha_pedido || ''
+        const formattedDate = date ? formatDate(date) : ''
+        
+        // Estado del pedido
+        const estado = String(o.estado || o.status || o.estado_pedido || o.state || '').toLowerCase()
+        const statusLabel = estado ? (estado.charAt(0).toUpperCase() + estado.slice(1)) : ''
+        const isDelivered = ['entregado','entregada','delivered','served','servido','completado','completed','finalizado','finalizada'].includes(estado)
+        const isCanceled = ['cancelado','cancelada','cancelled','canceled'].includes(estado)
+        const statusClass = isDelivered ? 'bg-emerald-100 text-emerald-800' : (isCanceled ? 'bg-rose-100 text-rose-800' : 'bg-gray-100 text-ink-700')
+
+        // 👇 Estado de pago DEL PEDIDO COMPLETO (IGUAL QUE EN PEDIDOS RECIENTES)
+        const pagoValue = o.pago || o.pagado || o.paid || o.is_paid || ''
+        const pagoStr = String(pagoValue).toLowerCase()
+        const pagado = pagoValue === true || pagoStr === 'pagado' || pagoStr === 'paid' || pagoStr === 'si' || pagoStr === 'yes' || pagoStr === 'true'
+        const paymentLabel = pagado ? 'Pagado' : 'No pagado'
+        const paymentClass = pagado ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'
+        
+        return (
+          <div key={o.id_pedido || o.id || o._id} className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100 last:border-0">
+            <div className="flex-1">
+              {/* Título del pedido con cantidad de productos */}
+              <div className="font-semibold">
+                Pedido #{o.id_pedido || o.id} · {count} Producto{count !== 1 ? 's' : ''}
               </div>
-            )
-          })
-  )}
-      </section>
+              
+              {/* Primeros 2-3 items como preview */}
+              <div className="text-sm text-ink-700">
+                {items.slice(0, 2).map(it => {
+                  const prod = it.product || it
+                  const nombre = prod.nombre || prod.name || it.nombre || it.name || 'Producto'
+                  const qty = it.cantidad || it.qty || it.quantity || 1
+                  return `${nombre} (x${qty})`
+                }).join(' • ')}
+                {items.length > 2 && ` • +${items.length - 2} más`}
+              </div>
+              
+              {/* Total y fecha */}
+              <div className="text-xs text-ink-500 mt-1">
+                ${Number(total).toLocaleString('es-CO')} {formattedDate ? '· ' + formattedDate : ''}
+              </div>
+              
+              {/* 👇 Badges de estado Y PAGO */}
+              <div className="flex gap-2 mt-2">
+                {statusLabel && (
+                  <div className={`inline-block text-xs px-2 py-1 rounded-full ${statusClass}`}>
+                    {statusLabel}
+                  </div>
+                )}
+                <div className={`inline-block text-xs px-2 py-1 rounded-full ${paymentClass}`}>
+                  {paymentLabel}
+                </div>
+              </div>
+            </div>
+            
+            {/* Botones de acción */}
+            <div className="flex flex-col gap-2">
+              <button 
+                onClick={() => handleRepetirPedido(o)} 
+                className="text-xs bg-brand-500 text-white px-3 py-1 rounded-full hover:bg-brand-500/90 transition-colors whitespace-nowrap"
+              >
+                Pedir de nuevo
+              </button>      
+              <button 
+                onClick={() => { 
+                  setSelectedOrder(o); 
+                  setShowHistoryDetailsModal(true) 
+                }} 
+                className="text-xs border border-gray-200 text-ink-700 px-3 py-1 rounded-full hover:bg-gray-50 transition-colors whitespace-nowrap"
+              >
+                Detalles
+              </button>                      
+            </div>
+          </div>
+        )
+      })
+    )}
+  </section>
 
       
 

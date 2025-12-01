@@ -81,6 +81,35 @@ export default function CheckoutPreview() {
         }
     }
         
+    // Botón de pagar todo
+    async function handlePay() {
+    try {
+      if (!pedidosPendientes || pedidosPendientes.length === 0) {
+        return toast.show("No hay pedidos pendientes por pagar", { type: "error" })
+      }
+
+      const pedidosIds = pedidosPendientes.map(p => p.id || p.id_pedido)
+
+      const total = pedidosPendientes.reduce((acc, p) => acc + Number(p.total), 0)
+
+      const res = await api.post(
+        "/api/wompi/crear-transaccion",
+        {
+          id_pedido: pedidosIds[0], // por ahora solo 1 pedido por transacción
+          total
+        }
+      )
+
+      const url = res.checkoutUrl
+      if (!url) throw new Error("No se recibió URL de pago")
+
+      window.location.href = url
+
+    } catch (e) {
+      console.error("Error iniciando pago", e)
+      toast.show("Error iniciando pago", { type: "error" })
+    }
+  }
     
     
 
@@ -177,15 +206,25 @@ export default function CheckoutPreview() {
 
                 {/* Botón de pago */}
                 <button
-                onClick={() => {
-                    console.log('Pagar todo', pedidosPendientes)
-                    console.log('Total:', totalPendiente)
-                    // 🔗 Aquí conectaremos con Wompi
-                }}
-                className="bg-brand-500 text-white px-8 py-3 rounded-full font-semibold hover:bg-brand-600 transition-colors shadow-md hover:shadow-lg"
+                onClick={handlePay}
+                className="
+                    rounded-full
+                    bg-brand-500
+                    text-white
+                    px-4 py-2
+                    text-sm
+                    font-semibold
+                    hover:bg-brand-500/90
+                    transition-colors
+                "
                 >
-                Pagar todo
+                Pagar ahora 💳
                 </button>
+
+
+
+
+
             </div>
             </div>
         </div>
