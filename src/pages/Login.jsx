@@ -24,7 +24,10 @@ export default function Login() {
           nombre: form.get('nombre'),
           correo: form.get('email'),
           contrasena: form.get('password')
+
+          
         }
+        console.log("PAYLOAD SIGNUP:", payload);
         const res = await api.post('/api/auth/signup', payload, { credentials: 'omit', noAuth: true })
         // backend might return a token string or an object containing the token/user.
         // Prefer passing the full response to `login()` so the AuthContext can extract token/user.
@@ -58,7 +61,9 @@ export default function Login() {
         correo: formLogin.get('email'),
         contrasena: formLogin.get('password')
       }
-      if (import.meta.env.MODE === 'development') console.debug("ENVIANDO PAYLOAD:", payload);
+
+      console.log("ENVIANDO PAYLOAD:", payload);
+
   const res = await api.post('/api/auth/login', payload, { credentials: 'omit', noAuth: true })
   // prefer passing the whole response to login() so context can store user if provided
   login(res)
