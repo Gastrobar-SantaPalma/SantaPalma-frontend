@@ -2,8 +2,12 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useCart } from "../store/cart";
+import { useToast } from "../components/Toast.jsx";
+
+
 
 const StarDisplay = ({ value, count }) => {
+
   return (
     <div className="flex items-center gap-2">
       <div className="flex text-yellow-400 text-xl">
@@ -19,6 +23,68 @@ const StarDisplay = ({ value, count }) => {
     </div>
   )
 }
+function RatingForm({ productId, onAdded }) {
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const toast = useToast();
+
+
+  async function submit() {
+    try {
+      // Normalizar id de producto (acepta strings con ':' etc)
+      const cleanId = String(productId).replace(/^:/, "");
+
+      await api.post(`/api/productos/${cleanId}/calificacion`, {
+        puntuacion: rating,
+        comentario: comment
+      });
+
+      toast.show('Calificación enviada con éxito', { type: 'success' });
+
+      // limpiar formulario
+      setRating(0);
+      setComment("");
+
+      onAdded?.(); // refrescar comentarios en el padre
+    } catch (e) {
+      console.error('Error enviando calificación', e);
+      const msg = e?.data?.message || e?.message || 'Error al enviar calificación';
+      toast.show(msg, { type: 'error' });
+    }
+  }
+
+
+  return (
+    <div className="p-4 bg-white rounded-xl shadow space-y-3">
+      <h4 className="font-semibold">Califica este producto</h4>
+
+      <div className="flex gap-1 text-2xl">
+        {[1, 2, 3, 4, 5].map(num => (
+          <button key={num} onClick={() => setRating(num)}>
+            <span className={num <= rating ? "text-yellow-400" : "text-gray-300"}>
+              ★
+            </span>
+          </button>
+        ))}
+      </div>
+
+      <textarea
+        className="w-full p-2 border rounded"
+        placeholder="Escribe un comentario (opcional)"
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+      />
+
+      <button
+        onClick={submit}
+        className="w-full bg-brand-600 text-white py-2 rounded"
+      >
+        Enviar calificación
+      </button>
+    </div>
+  );
+}
+
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -29,6 +95,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [comments, setComments] = useState([]);
   const [stats, setStats] = useState({ average: 0, count: 0 });
+  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -37,13 +104,14 @@ export default function ProductDetail() {
         // Cargar producto
         const resProduct = await api.get(`/api/productos/${id}`, { noAuth: true });
         setProduct(resProduct);
-        
+
         // Usar el promedio que viene directamente en el producto
         const avgRating = Number(resProduct.promedio_calificacion || resProduct.average_rating || 0);
 
         // Cargar comentarios
         try {
-          const resComments = await api.get(`/api/productos/${id}/comentarios`, { noAuth: true });
+          const resComments = await api.get(`/api/calificaciones/${id}`);
+
           if (resComments) {
             setComments(resComments.comentarios || resComments.comments || []);
             setStats({
@@ -115,6 +183,44 @@ export default function ProductDetail() {
       >
         Agregar al carrito
       </button>
+      {/* Botón para calificar */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
+          <div className="bg-white w-11/12 max-w-md p-6 rounded-2xl shadow-xl relative">
+
+            <button
+              onClick={() => setShowForm(false)}
+              className="absolute top-3 right-3 text-gray-500 text-xl"
+            >
+              ✕
+            </button>
+
+            <RatingForm
+              productId={id}
+              onAdded={async () => {
+                setShowForm(false);
+
+                // Recargar comentarios
+                const resComments = await api.get(`/api/calificaciones/${id}`);
+
+                setComments(resComments.comentarios || []);
+                setStats(prev => ({
+                  ...prev,
+                  count: Number(resComments.total || resComments.count || 0)
+                }));
+              }}
+            />
+          </div>
+        </div>
+      )}
+      <button
+        onClick={() => setShowForm(true)}
+        className="w-full py-3 bg-yellow-500 text-white rounded-xl mt-4"
+      >
+        Calificar producto ⭐
+      </button>
+
+
 
       {/* Sección de Comentarios */}
       <div className="mt-8">
