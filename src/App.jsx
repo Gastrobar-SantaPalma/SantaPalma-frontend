@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+
 import AppLayout from "./layouts/AppLayout";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -11,6 +12,7 @@ import ProductDetail from "./pages/ProductDetail"; // <<-- MANTENIDO de HEAD
 import { OrderProvider } from "./context/OrderContext"; // <<-- MANTENIDO de HEAD
 import TableLanding from "./pages/TableLanding"; // <<-- MANTENIDO de main
 import CheckoutPreview from "./pages/CheckoutPreview";
+
 
 export default function App() {
   return (
