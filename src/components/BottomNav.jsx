@@ -45,6 +45,14 @@ export default function BottomNav() {
           )}
         </NavLink>
 
+        {/* Social */}
+        <NavLink
+          to="/social"
+          className={({ isActive }) => `${base} ${isActive ? active : idle}`}
+        >
+          Social
+        </NavLink>
+
         {/* Cuenta */}
         <NavLink
           to="/account"

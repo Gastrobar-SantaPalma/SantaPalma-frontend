@@ -11,6 +11,7 @@ import ProductDetail from "./pages/ProductDetail"; // <<-- MANTENIDO de HEAD
 import { OrderProvider } from "./context/OrderContext"; // <<-- MANTENIDO de HEAD
 import TableLanding from "./pages/TableLanding"; // <<-- MANTENIDO de main
 import CheckoutPreview from "./pages/CheckoutPreview";
+import SocialPage from "./pages/SocialPage";
 
 export default function App() {
   return (
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/cart" element={<Orders />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/account" element={<Account />} />
+        <Route path="/social" element={<SocialPage />} />
         <Route path="/checkout" element={<CheckoutPreview />} />
       </Route>
 
