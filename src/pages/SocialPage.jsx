@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { socialActiveUsers } from "../mocks/socialActiveUsers";
+import { useEffect, useState } from "react";
+import { socialThemes } from "../mocks/socialthemes";
 
 function getInitials(nombre = "") {
   return nombre
@@ -44,8 +44,56 @@ function StoryViewer({ user, onClose }) {
 }
 
 export default function SocialPage() {
+  
   const [selectedUser, setSelectedUser] = useState(null);
-  const users = useMemo(() => socialActiveUsers, []);
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const getLoggedUserId = () => {
+    try {
+      const raw = localStorage.getItem("user");
+      if (!raw) return null;
+      const user = JSON.parse(raw);
+      return user?.id_usuario ?? null;
+    } catch {
+      return null;
+    }
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchUsers = async () => {
+      try {
+        if (isMounted) setError(null);
+
+        const response = await fetch("http://localhost:4000/api/social/active-users");
+        const data = await response.json();
+
+        if (isMounted) setUsers(Array.isArray(data) ? data : []);
+      } catch (err) {
+        if (isMounted) setError("Error cargando usuarios");
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    // 1) primera carga inmediata
+    fetchUsers();
+
+    // 2) polling cada 30s
+    const intervalId = setInterval(fetchUsers, 30000);
+
+    // 3) cleanup al desmontar la página
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, []);
+
+  if (loading) return <div>Cargando usuarios...</div>;
+  if (error) return <div>{error}</div>;
 
   return (
     <section className="space-y-4">
@@ -53,6 +101,60 @@ export default function SocialPage() {
         <h1 className="text-2xl font-bold text-ink-900">Social</h1>
         <p className="mt-1 text-sm text-ink-500">Usuarios activos en este momento.</p>
       </header>
+
+      <div className="-mx-1 overflow-x-auto px-1 pb-1">
+        <div className="flex min-w-max items-start gap-4">
+          {users.map((user) => {
+            const initials = getInitials(user.nombre);
+
+            return (
+              <button
+                key={`story-${user.user_id}`}
+                type="button"
+                onClick={() => setSelectedUser(user)}
+                className="group flex w-20 shrink-0 flex-col items-center gap-2 text-center"
+                aria-label={`Ver story de ${user.nombre}`}
+              >
+                <div
+                  className={`rounded-full p-0.5 transition group-hover:scale-105 ${
+                    user.hasStory ? "bg-gradient-to-br from-brand-500 via-pink-500 to-amber-400" : "bg-gray-200"
+                  }`}
+                >
+                  <div className="h-16 w-16 overflow-hidden rounded-full bg-brand-100">
+                    {user.foto ? (
+                      <img src={user.foto} alt={user.nombre} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center text-base font-bold text-brand-700">
+                        {initials}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <p className="line-clamp-2 text-xs font-medium text-ink-700">{user.nombre}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="-mx-1 overflow-x-auto px-1 pb-1">
+        <div className="grid min-w-max gap-3">
+          {socialThemes.map((theme) => (
+            <article
+              key={theme.key}
+              className="max-h-[100px] w-30 shrink-0 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
+            >
+              <div className="flex h-full flex-col justify-between gap-3">
+                <p className="text-base font-semibold text-ink-900">{theme.label}</p>
+                <span className="w-fit rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">
+                  {theme.userCount} usuarios
+                </span>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {users.map((user) => {

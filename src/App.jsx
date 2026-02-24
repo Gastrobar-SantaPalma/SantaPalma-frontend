@@ -12,8 +12,51 @@ import { OrderProvider } from "./context/OrderContext"; // <<-- MANTENIDO de HEA
 import TableLanding from "./pages/TableLanding"; // <<-- MANTENIDO de main
 import CheckoutPreview from "./pages/CheckoutPreview";
 import SocialPage from "./pages/SocialPage";
+import { useEffect } from "react";
 
 export default function App() {
+
+  useEffect(() => {
+    const getLoggedUserId = () => {
+      try {
+        const raw = localStorage.getItem("user");
+        if (!raw) return null;
+        const user = JSON.parse(raw);
+        return user?.id_usuario ?? null;
+      } catch {
+        return null;
+      }
+    };
+
+    const userId = getLoggedUserId();
+    if (!userId) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        if (document.visibilityState !== "visible") return;
+        await fetch("http://localhost:4000/api/social/heartbeat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId, table_id: null })
+        });
+      } catch {}
+    };
+
+    sendHeartbeat();
+
+    const intervalId = setInterval(sendHeartbeat, 60000);
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") sendHeartbeat();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
+
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
