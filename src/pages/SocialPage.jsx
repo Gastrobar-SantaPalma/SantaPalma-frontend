@@ -1,99 +1,44 @@
-import { useEffect, useState } from "react";
-import { socialThemes } from "../mocks/socialthemes";
-
-function getInitials(nombre = "") {
-  return nombre
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase())
-    .join("");
-}
-
-function StoryViewer({ user, onClose }) {
-  if (!user) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center bg-black/60 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`Story de ${user.nombre}`}
-    >
-      <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">StoryViewer</p>
-            <h2 className="text-xl font-bold text-ink-900">{user.nombre}</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="rounded-full bg-gray-100 px-3 py-1.5 text-sm font-medium text-ink-700 hover:bg-gray-200"
-          >
-            Cerrar
-          </button>
-        </div>
-
-        <div className="mt-4 rounded-xl border border-dashed border-brand-200 bg-brand-50/40 p-6 text-center text-sm text-ink-600">
-          Placeholder del visor de historias.
-          <p className="mt-2 font-medium">"{user.floatingMessage}"</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { useState } from "react";
+import { fetchActiveUsers, fetchStoryPeople, fetchStoryThemes, fetchUserStories } from "../api/socialApi";
+import ActiveUsersGrid from "../components/social/ActiveUsersGrid";
+import StoriesBar from "../components/social/StoriesBar";
+import StoryViewer from "../components/social/StoryViewer";
+import ThemesBar from "../components/social/ThemesBar";
+import { usePolling } from "../hooks/usePolling";
 
 export default function SocialPage() {
-  
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const venueId = 1; // TODO: Obtener venueId dinámicamente desde contexto/ruta.
+  const activeUsers = usePolling(fetchActiveUsers, 30000, true);
+  const storyPeople = usePolling(() => fetchStoryPeople(venueId), 30000, true);
+  const themes = usePolling(() => fetchStoryThemes(venueId), 30000, true);
 
-  const getLoggedUserId = () => {
+  const [selectedStoryUser, setSelectedStoryUser] = useState(null);
+  const [selectedUserStories, setSelectedUserStories] = useState([]);
+  const [loadingStories, setLoadingStories] = useState(false);
+
+  const openStoryViewer = async (user) => {
+    if (!user?.user_id) return;
+
+    setSelectedStoryUser(user);
+    setLoadingStories(true);
     try {
-      const raw = localStorage.getItem("user");
-      if (!raw) return null;
-      const user = JSON.parse(raw);
-      return user?.id_usuario ?? null;
+       const stories = await fetchUserStories(venueId, user.user_id);
+      setSelectedUserStories(stories);
     } catch {
-      return null;
+      setSelectedUserStories([]);
+    } finally {
+      setLoadingStories(false);
     }
   };
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchUsers = async () => {
-      try {
-        if (isMounted) setError(null);
-
-        const response = await fetch("http://localhost:4000/api/social/active-users");
-        const data = await response.json();
-
-        if (isMounted) setUsers(Array.isArray(data) ? data : []);
-      } catch (err) {
-        if (isMounted) setError("Error cargando usuarios");
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    // 1) primera carga inmediata
-    fetchUsers();
-
-    // 2) polling cada 30s
-    const intervalId = setInterval(fetchUsers, 30000);
-
-    // 3) cleanup al desmontar la página
-    return () => {
-      isMounted = false;
-      clearInterval(intervalId);
-    };
-  }, []);
-
-  if (loading) return <div>Cargando usuarios...</div>;
-  if (error) return <div>{error}</div>;
+  const closeStoryViewer = () => {
+    setSelectedStoryUser(null);
+    setSelectedUserStories([]);
+    setLoadingStories(false);
+  };
+  const hasBlockingLoading = activeUsers.loading && storyPeople.loading && themes.loading;
+  const hasBlockingError = activeUsers.error && storyPeople.error && themes.error;
+  if (hasBlockingLoading) return <div>Cargando Social...</div>;
+  if (hasBlockingError) return <div>Error cargando Social.</div>;
 
   return (
     <section className="space-y-4">
@@ -101,104 +46,17 @@ export default function SocialPage() {
         <h1 className="text-2xl font-bold text-ink-900">Social</h1>
         <p className="mt-1 text-sm text-ink-500">Usuarios activos en este momento.</p>
       </header>
-
-      <div className="-mx-1 overflow-x-auto px-1 pb-1">
-        <div className="flex min-w-max items-start gap-4">
-          {users.map((user) => {
-            const initials = getInitials(user.nombre);
-
-            return (
-              <button
-                key={`story-${user.user_id}`}
-                type="button"
-                onClick={() => setSelectedUser(user)}
-                className="group flex w-20 shrink-0 flex-col items-center gap-2 text-center"
-                aria-label={`Ver story de ${user.nombre}`}
-              >
-                <div
-                  className={`rounded-full p-0.5 transition group-hover:scale-105 ${
-                    user.hasStory ? "bg-gradient-to-br from-brand-500 via-pink-500 to-amber-400" : "bg-gray-200"
-                  }`}
-                >
-                  <div className="h-16 w-16 overflow-hidden rounded-full bg-brand-100">
-                    {user.foto ? (
-                      <img src={user.foto} alt={user.nombre} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-base font-bold text-brand-700">
-                        {initials}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <p className="line-clamp-2 text-xs font-medium text-ink-700">{user.nombre}</p>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="-mx-1 overflow-x-auto px-1 pb-1">
-        <div className="grid min-w-max gap-3">
-          {socialThemes.map((theme) => (
-            <article
-              key={theme.key}
-              className="max-h-[100px] w-30 shrink-0 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"
-            >
-              <div className="flex h-full flex-col justify-between gap-3">
-                <p className="text-base font-semibold text-ink-900">{theme.label}</p>
-                <span className="w-fit rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">
-                  {theme.userCount} usuarios
-                </span>
-              </div>
-            </article>
-          ))}
-        </div>
-      </div>
-
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {users.map((user) => {
-          const initials = getInitials(user.nombre);
-
-          return (
-            <button
-              key={user.user_id}
-              type="button"
-              onClick={() => setSelectedUser(user)}
-              className="relative flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <span className="absolute right-3 top-2 max-w-[65%] truncate rounded-full bg-ink-900 px-2.5 py-1 text-[10px] font-medium text-white shadow">
-                {user.floatingMessage}
-              </span>
-
-              <div className={`relative rounded-full p-0.5 ${user.hasStory ? "bg-gradient-to-br from-brand-500 via-pink-500 to-amber-400" : "bg-gray-200"}`}>
-                <div className="relative h-14 w-14 overflow-hidden rounded-full bg-brand-100">
-                  {user.foto ? (
-                    <img src={user.foto} alt={user.nombre} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-base font-bold text-brand-700">
-                      {initials}
-                    </div>
-                  )}
-                  <span
-                    className={`absolute bottom-0.5 right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white ${
-                      user.isOnline ? "bg-emerald-500" : "bg-gray-400"
-                    }`}
-                    aria-label={user.isOnline ? "En línea" : "Desconectado"}
-                  />
-                </div>
-              </div>
-
-              <div className="min-w-0 pt-3">
-                <p className="truncate text-sm font-semibold text-ink-900">{user.nombre}</p>
-                <p className="text-xs text-ink-500">{user.isOnline ? "Online" : "Offline"}</p>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      <StoryViewer user={selectedUser} onClose={() => setSelectedUser(null)} />
+      <StoriesBar people={storyPeople.data} onSelect={openStoryViewer} />
+      <ThemesBar themes={themes.data} onSelect={() => {}} />
+      <ActiveUsersGrid users={activeUsers.data} onSelect={openStoryViewer} />
+      {loadingStories && selectedStoryUser ? (
+        <div className="fixed inset-0 z-[85] grid place-items-center bg-black/70 text-sm font-medium text-white">Cargando historias...</div>
+      ) : null}
+       <StoryViewer
+        isOpen={Boolean(selectedStoryUser) && !loadingStories}
+        user={selectedStoryUser}
+        stories={selectedUserStories}
+        onClose={closeStoryViewer}
+      />
     </section>
-  );
-}
+  );}
